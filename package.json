@@ -1,0 +1,12 @@
+{
+  "name": "league-scheduler",
+  "version": "1.0.0",
+  "description": "Volleyball league scheduler",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0"
+  }
+}

@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Volleyball League Scheduler</title>
+  <style>
+    /* -----------------------------------------------------------------------
+       Base / Reset
+    ----------------------------------------------------------------------- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 14px;
+      background: #f0f2f5;
+      color: #222;
+    }
+
+    /* -----------------------------------------------------------------------
+       Header
+    ----------------------------------------------------------------------- */
+    header {
+      background: #1a2742;
+      color: #fff;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header .logo {
+      font-size: 28px;
+    }
+    header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: .5px;
+    }
+    header p {
+      font-size: 12px;
+      opacity: .75;
+      margin-top: 2px;
+    }
+
+    /* -----------------------------------------------------------------------
+       Layout
+    ----------------------------------------------------------------------- */
+    main {
+      max-width: 1100px;
+      margin: 28px auto;
+      padding: 0 16px;
+    }
+
+    /* -----------------------------------------------------------------------
+       Card
+    ----------------------------------------------------------------------- */
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.12);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .card-header {
+      background: #1a2742;
+      color: #fff;
+      padding: 12px 20px;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .card-header .toggle-icon {
+      margin-left: auto;
+      font-size: 18px;
+      transition: transform .2s;
+    }
+    .card-header.collapsed .toggle-icon {
+      transform: rotate(-90deg);
+    }
+    .card-body {
+      padding: 20px;
+    }
+    .card-body.hidden {
+      display: none;
+    }
+
+    /* -----------------------------------------------------------------------
+       Form
+    ----------------------------------------------------------------------- */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px 24px;
+    }
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .form-group.span2 {
+      grid-column: span 2;
+    }
+    @media (max-width: 640px) {
+      .form-group.span2 { grid-column: span 1; }
+    }
+    label {
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: #444;
+    }
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    input[type="time"],
+    textarea,
+    select {
+      border: 1px solid #ccd2de;
+      border-radius: 5px;
+      padding: 8px 10px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color .15s;
+      background: #fafbfc;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #3a6fce;
+      background: #fff;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    /* Venue rows */
+    #venueContainer .venue-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    #venueContainer .venue-row input[type="text"] {
+      flex: 2;
+    }
+    #venueContainer .venue-row input[type="number"] {
+      flex: 1;
+      min-width: 60px;
+    }
+    #venueContainer .venue-row button.remove-venue {
+      background: none;
+      border: none;
+      color: #c0392b;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 9px 20px;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, opacity .15s;
+    }
+    .btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+    .btn-primary {
+      background: #1a2742;
+      color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: #243660;
+    }
+    .btn-secondary {
+      background: #e8ecf4;
+      color: #1a2742;
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: #d0d8ec;
+    }
+    .btn-success {
+      background: #27ae60;
+      color: #fff;
+    }
+    .btn-success:hover:not(:disabled) {
+      background: #219a52;
+    }
+    .btn-outline {
+      background: transparent;
+      border: 2px solid #1a2742;
+      color: #1a2742;
+    }
+    .btn-outline:hover:not(:disabled) {
+      background: #1a2742;
+      color: #fff;
+    }
+    .btn-small {
+      padding: 5px 12px;
+      font-size: 12px;
+    }
+    .action-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 6px;
+    }
+
+    /* -----------------------------------------------------------------------
+       Status / Error Banner
+    ----------------------------------------------------------------------- */
+    #statusBanner {
+      display: none;
+      padding: 12px 18px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+    #statusBanner.error {
+      background: #fce8e6;
+      color: #b71c1c;
+      border-left: 4px solid #c62828;
+    }
+    #statusBanner.success {
+      background: #e6f4ea;
+      color: #1b5e20;
+      border-left: 4px solid #2e7d32;
+    }
+    #statusBanner.loading {
+      background: #e8f0fe;
+      color: #174ea6;
+      border-left: 4px solid #1967d2;
+    }
+
+    /* -----------------------------------------------------------------------
+       Divisions Summary
+    ----------------------------------------------------------------------- */
+    .divisions-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .division-box {
+      background: #f0f2f5;
+      border: 1px solid #dde3ee;
+      border-radius: 6px;
+      padding: 10px 14px;
+      min-width: 160px;
+    }
+    .division-box h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a2742;
+      margin-bottom: 6px;
+    }
+    .division-box ul {
+      list-style: none;
+      font-size: 13px;
+    }
+    .division-box ul li {
+      padding: 2px 0;
+      border-bottom: 1px solid #e4e8f0;
+    }
+    .division-box ul li:last-child {
+      border-bottom: none;
+    }
+
+    /* -----------------------------------------------------------------------
+       Schedule Tables
+    ----------------------------------------------------------------------- */
+    .week-header {
+      background: #2d4a8a;
+      color: #fff;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .week-header:hover {
+      background: #3557a0;
+    }
+    .week-header .week-meta {
+      font-size: 12px;
+      opacity: .8;
+      font-weight: 400;
+    }
+    .week-header .chev {
+      transition: transform .2s;
+    }
+    .week-header.collapsed .chev {
+      transform: rotate(-90deg);
+    }
+    .week-body {
+      overflow-x: auto;
+    }
+    .week-body.hidden {
+      display: none;
+    }
+    .week-note {
+      background: #fffde7;
+      border-bottom: 1px solid #fbc02d;
+      padding: 7px 16px;
+      font-size: 12px;
+      color: #7a5800;
+    }
+    table.schedule-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table.schedule-table thead th {
+      background: #eef1f8;
+      color: #1a2742;
+      font-weight: 700;
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 2px solid #c5cfe8;
+      white-space: nowrap;
+    }
+    table.schedule-table tbody tr:nth-child(even) {
+      background: #f8f9fc;
+    }
+    table.schedule-table tbody tr:hover {
+      background: #edf0fa;
+    }
+    table.schedule-table td {
+      padding: 7px 12px;
+      border-bottom: 1px solid #e8ecf4;
+      white-space: nowrap;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-div1  { background: #c8e6c9; color: #1b5e20; }
+    .badge-div2  { background: #bbdefb; color: #0d47a1; }
+    .badge-div3  { background: #ffe0b2; color: #e65100; }
+    .badge-div4  { background: #f8bbd0; color: #880e4f; }
+    .badge-div5  { background: #e1bee7; color: #4a148c; }
+    .badge-div6  { background: #b2dfdb; color: #004d40; }
+    .badge-qf    { background: #fff9c4; color: #827717; }
+    .badge-sf    { background: #ffe0b2; color: #bf360c; }
+    .badge-final { background: #ffcdd2; color: #b71c1c; }
+    .badge-3rd   { background: #e0f2f1; color: #004d40; }
+    .badge-5th   { background: #f3e5f5; color: #4a148c; }
+
+    /* Playoff night headers */
+    .playoff-night-header {
+      background: #7b1fa2;
+    }
+    .playoff-night-header:hover {
+      background: #9c27b0;
+    }
+
+    /* -----------------------------------------------------------------------
+       Export bar
+    ----------------------------------------------------------------------- */
+    #exportBar {
+      display: none;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    #exportBar.visible {
+      display: flex;
+    }
+
+    /* -----------------------------------------------------------------------
+       Print styles
+    ----------------------------------------------------------------------- */
+    @media print {
+      header, #configCard, #exportBar, #statusBanner,
+      .btn, .week-header .chev, .card-header .toggle-icon {
+        display: none !important;
+      }
+      body { background: #fff; font-size: 11px; }
+      main { max-width: 100%; margin: 0; padding: 0; }
+      .card { box-shadow: none; border: 1px solid #ccc; }
+      .card-body.hidden { display: block !important; }
+      .week-body.hidden { display: block !important; }
+      .week-header { background: #333 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      table.schedule-table thead th { background: #ddd !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .week-note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      a { text-decoration: none; }
+      /* Page breaks between weeks */
+      .week-card { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">&#127952;</div>
+  <div>
+    <h1 id="leagueTitle">Volleyball League Scheduler</h1>
+    <p>Configure your league below and generate a complete season schedule.</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- Status Banner -->
+  <div id="statusBanner"></div>
+
+  <!-- Export Bar (shown after generation) -->
+  <div id="exportBar">
+    <strong>Export:</strong>
+    <button class="btn btn-success btn-small" onclick="exportCSV()">&#8681; Download CSV</button>
+    <button class="btn btn-outline btn-small" onclick="window.print()">&#128438; Print / Save PDF</button>
+  </div>
+
+  <!-- Configuration Card -->
+  <div class="card" id="configCard">
+    <div class="card-header" id="configToggle">
+      &#9881; League Configuration
+      <span class="toggle-icon">&#9660;</span>
+    </div>
+    <div class="card-body" id="configBody">
+      <form id="leagueForm">
+        <div class="form-grid">
+
+          <!-- League Name -->
+          <div class="form-group span2">
+            <label for="leagueName">League Name</label>
+            <input type="text" id="leagueName" value="Tuesday Volleyball League" />
+          </div>
+
+          <!-- Teams -->
+          <div class="form-group span2">
+            <label>Teams (3–30 teams)</label>
+            <div id="teamsList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+            <div class="action-row">
+              <button type="button" class="btn btn-secondary btn-small" onclick="addTeamRow()">+ Add Team</button>
+              <span id="teamCount" style="font-size:12px;color:#666;margin-left:6px;"></span>
+            </div>
+          </div>
+
+          <!-- Season Start -->
+          <div class="form-group">
+            <label for="seasonStart">Season Start Date</label>
+            <input type="date" id="seasonStart" value="2026-05-05" />
+          </div>
+
+          <!-- Num Weeks -->
+          <div class="form-group">
+            <label for="numWeeks">Number of Regular Season Weeks</label>
+            <input type="number" id="numWeeks" min="1" max="20" value="4" />
+          </div>
+
+          <!-- Playoff Date 1 -->
+          <div class="form-group">
+            <label for="playoffDate1">Playoff Night 1 (QF + SF)</label>
+            <input type="date" id="playoffDate1" value="2026-06-02" />
+          </div>
+
+          <!-- Playoff Date 2 -->
+          <div class="form-group">
+            <label for="playoffDate2">Playoff Night 2 (Finals + Playdowns)</label>
+            <input type="date" id="playoffDate2" value="2026-06-09" />
+          </div>
+
+          <!-- Start Time -->
+          <div class="form-group">
+            <label for="startTime">Match Start Time</label>
+            <input type="time" id="startTime" value="18:30" />
+          </div>
+
+          <!-- Slot Duration -->
+          <div class="form-group">
+            <label for="slotDuration">Time Slot Duration (minutes)</label>
+            <input type="number" id="slotDuration" min="15" max="120" value="35" />
+          </div>
+
+          <!-- Venues -->
+          <div class="form-group span2">
+            <label>Venues &amp; Courts</label>
+            <div id="venueContainer">
+              <!-- Populated by JS -->
+            </div>
+            <div class="action-row" style="margin-top:6px;">
+              <button type="button" class="btn btn-secondary btn-small" onclick="addVenueRow()">+ Add Venue</button>
+            </div>
+          </div>
+
+        </div><!-- /.form-grid -->
+
+        <div class="action-row" style="margin-top:20px;">
+          <button type="submit" class="btn btn-primary" id="generateBtn">&#9654; Generate Schedule</button>
+          <button type="button" class="btn btn-secondary" onclick="resetForm()">&#8635; Reset</button>
+        </div>
+      </form>
+    </div><!-- /#configBody -->
+  </div><!-- /#configCard -->
+
+  <!-- Results Container -->
+  <div id="resultsContainer"></div>
+
+</main>
+
+<script>
+// =============================================================================
+// Team rows
+// =============================================================================
+
+const defaultTeams = [
+  'Team Alpha','Team Beta','Team Gamma',
+  'Team Delta','Team Epsilon','Team Zeta',
+  'Team Eta','Team Theta','Team Iota',
+  'Team Kappa','Team Lambda','Team Mu',
+];
+
+function addTeamRow(name = '') {
+  const list = document.getElementById('teamsList');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  row.innerHTML = `
+    <span style="width:22px;text-align:right;color:#999;font-size:12px;" class="team-num"></span>
+    <input type="text" placeholder="Team name" value="${escapeAttr(name)}"
+      style="flex:1;" class="team-name-input" oninput="updateTeamNums()" />
+    <button type="button" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:2px 6px;"
+      onclick="removeTeamRow(this)" title="Remove team">&#10005;</button>
+  `;
+  list.appendChild(row);
+  updateTeamNums();
+}
+
+function removeTeamRow(btn) {
+  const rows = document.querySelectorAll('#teamsList > div');
+  if (rows.length <= 3) {
+    showStatus('You need at least 3 teams.', 'error');
+    return;
+  }
+  btn.closest('div').remove();
+  updateTeamNums();
+}
+
+function updateTeamNums() {
+  const rows = document.querySelectorAll('#teamsList > div');
+  rows.forEach((row, i) => {
+    const num = row.querySelector('.team-num');
+    if (num) num.textContent = (i + 1) + '.';
+  });
+  const count = document.getElementById('teamCount');
+  if (count) count.textContent = `${rows.length} team${rows.length !== 1 ? 's' : ''}`;
+}
+
+function getTeams() {
+  return Array.from(document.querySelectorAll('.team-name-input'))
+    .map(i => i.value.trim())
+    .filter(t => t.length > 0);
+}
+
+// =============================================================================
+// Venue rows
+// =============================================================================
+
+const defaultVenues = [
+  { name: 'Venue 1', courts: 2 },
+  { name: 'Venue 2', courts: 2 },
+];
+
+function renderVenues(venues) {
+  const container = document.getElementById('venueContainer');
+  container.innerHTML = '';
+  venues.forEach((v, i) => addVenueRow(v.name, v.courts));
+}
+
+function addVenueRow(name = '', courts = 2) {
+  const container = document.getElementById('venueContainer');
+  const row = document.createElement('div');
+  row.className = 'venue-row';
+  row.innerHTML = `
+    <input type="text" placeholder="Venue name" value="${escapeAttr(name)}" class="venue-name" />
+    <input type="number" min="1" max="10" value="${courts}" class="venue-courts" title="Number of courts" />
+    <button type="button" class="remove-venue" title="Remove venue" onclick="removeVenueRow(this)">&#10005;</button>
+  `;
+  container.appendChild(row);
+}
+
+function removeVenueRow(btn) {
+  const rows = document.querySelectorAll('#venueContainer .venue-row');
+  if (rows.length <= 1) {
+    showStatus('You must have at least one venue.', 'error');
+    return;
+  }
+  btn.closest('.venue-row').remove();
+}
+
+function getVenues() {
+  const rows = document.querySelectorAll('#venueContainer .venue-row');
+  const venues = [];
+  rows.forEach(row => {
+    const name = row.querySelector('.venue-name').value.trim();
+    const courts = parseInt(row.querySelector('.venue-courts').value, 10) || 1;
+    if (name) venues.push({ name, courts });
+  });
+  return venues;
+}
+
+// =============================================================================
+// Collapsible card headers
+// =============================================================================
+
+document.getElementById('configToggle').addEventListener('click', () => {
+  const body = document.getElementById('configBody');
+  const toggle = document.getElementById('configToggle');
+  body.classList.toggle('hidden');
+  toggle.classList.toggle('collapsed');
+});
+
+// =============================================================================
+// Form submit → API call → render
+// =============================================================================
+
+document.getElementById('leagueForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await generateSchedule();
+});
+
+async function generateSchedule() {
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  showStatus('Generating schedule…', 'loading');
+
+  // Collect teams
+  const rawTeams = getTeams();
+
+  if (rawTeams.length < 3) {
+    showStatus('Please enter at least 3 teams.', 'error');
+    btn.disabled = false;
+    return;
+  }
+  if (rawTeams.length > 30) {
+    showStatus('Maximum 30 teams supported.', 'error');
+    btn.disabled = false;
+    return;
+  }
+
+  const venues = getVenues();
+  if (venues.length === 0) {
+    showStatus('Please add at least one venue.', 'error');
+    btn.disabled = false;
+    return;
+  }
+
+  const payload = {
+    teams:           rawTeams,
+    leagueName:      document.getElementById('leagueName').value.trim() || 'Volleyball League',
+    seasonStartDate: document.getElementById('seasonStart').value,
+    numWeeks:        parseInt(document.getElementById('numWeeks').value, 10) || 4,
+    playoffDate1:    document.getElementById('playoffDate1').value || null,
+    playoffDate2:    document.getElementById('playoffDate2').value || null,
+    venues,
+    startTime:       document.getElementById('startTime').value || '18:30',
+    slotDuration:    parseInt(document.getElementById('slotDuration').value, 10) || 35,
+  };
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showStatus('Server error: ' + (data.error || res.statusText), 'error');
+      btn.disabled = false;
+      return;
+    }
+
+    // Store for export
+    window._scheduleData = data;
+
+    // Render
+    renderResults(data);
+    document.getElementById('leagueTitle').textContent = data.leagueName || 'Volleyball League Scheduler';
+    showStatus(`Schedule generated: ${data.weeks.length} regular season week(s)` +
+      (data.playoffs ? ' + playoffs.' : '.'), 'success');
+    document.getElementById('exportBar').classList.add('visible');
+
+    // Collapse config panel
+    document.getElementById('configBody').classList.add('hidden');
+    document.getElementById('configToggle').classList.add('collapsed');
+
+    // Scroll to results
+    document.getElementById('resultsContainer').scrollIntoView({ behavior: 'smooth' });
+
+  } catch (err) {
+    showStatus('Network error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// =============================================================================
+// Rendering
+// =============================================================================
+
+function renderResults(data) {
+  const container = document.getElementById('resultsContainer');
+  container.innerHTML = '';
+
+  // Divisions summary
+  if (data.divisions && data.divisions.length) {
+    const divCard = createCard('Division Assignments');
+    const grid = document.createElement('div');
+    grid.className = 'divisions-grid';
+    data.divisions.forEach((div, i) => {
+      const box = document.createElement('div');
+      box.className = 'division-box';
+      box.innerHTML = `<h4>${esc(div.name)}</h4><ul>` +
+        div.teams.map(t => `<li>${esc(t)}</li>`).join('') +
+        '</ul>';
+      grid.appendChild(box);
+    });
+    divCard.body.appendChild(grid);
+    container.appendChild(divCard.card);
+  }
+
+  // Regular season weeks
+  if (data.weeks && data.weeks.length) {
+    const weekCard = createCard('Regular Season Schedule');
+    data.weeks.forEach(week => {
+      weekCard.body.appendChild(buildWeekSection(week));
+    });
+    container.appendChild(weekCard.card);
+  }
+
+  // Playoffs
+  if (data.playoffs) {
+    const pfCard = createCard('Playoffs');
+    if (data.playoffs.night1) {
+      pfCard.body.appendChild(buildNightSection(data.playoffs.night1, 'Playoff Night 1'));
+    }
+    if (data.playoffs.night2) {
+      pfCard.body.appendChild(buildNightSection(data.playoffs.night2, 'Playoff Night 2'));
+    }
+    container.appendChild(pfCard.card);
+  }
+}
+
+/** Create a collapsible card with a given title. Returns { card, body }. */
+function createCard(title) {
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  header.innerHTML = esc(title) + '<span class="toggle-icon">&#9660;</span>';
+  header.addEventListener('click', () => {
+    body.classList.toggle('hidden');
+    header.classList.toggle('collapsed');
+  });
+
+  const body = document.createElement('div');
+  body.className = 'card-body';
+  body.style.padding = '0';
+
+  card.appendChild(header);
+  card.appendChild(body);
+  return { card, body };
+}
+
+/** Build a collapsible week section (header + note + table). */
+function buildWeekSection(week) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'week-card';
+
+  const header = document.createElement('div');
+  header.className = 'week-header';
+  header.innerHTML = `
+    <span>Week ${week.weekNum} &mdash; ${formatDate(week.date)}</span>
+    <span class="week-meta">${week.matches.length} match${week.matches.length !== 1 ? 'es' : ''}</span>
+    <span class="chev">&#9660;</span>
+  `;
+
+  const body = document.createElement('div');
+  body.className = 'week-body';
+
+  if (week.note) {
+    const note = document.createElement('div');
+    note.className = 'week-note';
+    note.textContent = week.note;
+    body.appendChild(note);
+  }
+
+  body.appendChild(buildMatchTable(week.matches));
+
+  header.addEventListener('click', () => {
+    body.classList.toggle('hidden');
+    header.classList.toggle('collapsed');
+  });
+
+  wrapper.appendChild(header);
+  wrapper.appendChild(body);
+  return wrapper;
+}
+
+/** Build a collapsible playoff night section. */
+function buildNightSection(night, title) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'week-card';
+
+  const header = document.createElement('div');
+  header.className = 'week-header playoff-night-header';
+  header.innerHTML = `
+    <span>${esc(title)} &mdash; ${formatDate(night.date)}</span>
+    <span class="week-meta">${night.matches.length} match${night.matches.length !== 1 ? 'es' : ''}</span>
+    <span class="chev">&#9660;</span>
+  `;
+
+  const body = document.createElement('div');
+  body.className = 'week-body';
+  body.appendChild(buildMatchTable(night.matches, true));
+
+  header.addEventListener('click', () => {
+    body.classList.toggle('hidden');
+    header.classList.toggle('collapsed');
+  });
+
+  wrapper.appendChild(header);
+  wrapper.appendChild(body);
+  return wrapper;
+}
+
+/** Build the schedule table from a matches array. */
+function buildMatchTable(matches, isPlayoff = false) {
+  const table = document.createElement('table');
+  table.className = 'schedule-table';
+
+  const thead = document.createElement('thead');
+  thead.innerHTML = `<tr>
+    <th>Time</th>
+    <th>Venue</th>
+    <th>Court</th>
+    <th>${isPlayoff ? 'Round' : 'Division'}</th>
+    <th>Home Team</th>
+    <th>Away Team</th>
+    ${isPlayoff ? '<th>Note</th>' : '<th>Score (Home)</th><th>Score (Away)</th>'}
+  </tr>`;
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  matches.forEach(m => {
+    const tr = document.createElement('tr');
+    const divLabel = isPlayoff ? (m.round || '') : (m.division || '');
+    const badgeClass = getBadgeClass(divLabel, isPlayoff);
+    tr.innerHTML = `
+      <td>${esc(m.time || '')}</td>
+      <td>${esc(m.venue || '')}</td>
+      <td>${esc(String(m.court || ''))}</td>
+      <td><span class="badge ${badgeClass}">${esc(divLabel)}</span></td>
+      <td>${esc(m.teamA || '')}</td>
+      <td>${esc(m.teamB || '')}</td>
+      ${isPlayoff
+        ? `<td style="font-size:11px;color:#666;">${esc(m.note || '')}</td>`
+        : '<td></td><td></td>'}
+    `;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  return table;
+}
+
+/** Return a CSS badge class based on division name or round. */
+function getBadgeClass(label, isPlayoff) {
+  if (isPlayoff) {
+    const l = label.toLowerCase();
+    if (l === 'qf')          return 'badge-qf';
+    if (l === 'sf')          return 'badge-sf';
+    if (l === 'final')       return 'badge-final';
+    if (l === '3rd place')   return 'badge-3rd';
+    if (l === '5th place')   return 'badge-5th';
+    return 'badge-div1';
+  }
+  const match = label.match(/(\d+)$/);
+  if (match) {
+    const n = parseInt(match[1], 10);
+    return `badge-div${Math.min(n, 6)}`;
+  }
+  return 'badge-div1';
+}
+
+// =============================================================================
+// CSV Export
+// =============================================================================
+
+function exportCSV() {
+  const data = window._scheduleData;
+  if (!data) return;
+
+  const rows = [
+    ['Date', 'Time', 'Venue', 'Court', 'Division', 'Home Team', 'Away Team', 'Game 1 Score Home', 'Game 1 Score Away']
+  ];
+
+  // Regular season
+  (data.weeks || []).forEach(week => {
+    (week.matches || []).forEach(m => {
+      rows.push([week.date, m.time, m.venue, m.court, m.division, m.teamA, m.teamB, '', '']);
+    });
+  });
+
+  // Playoffs
+  if (data.playoffs) {
+    [data.playoffs.night1, data.playoffs.night2].forEach(night => {
+      if (!night) return;
+      (night.matches || []).forEach(m => {
+        rows.push([night.date, m.time, m.venue, m.court, m.round, m.teamA, m.teamB, '', '']);
+      });
+    });
+  }
+
+  const csv = rows.map(row =>
+    row.map(cell => {
+      const s = String(cell == null ? '' : cell);
+      // Escape quotes and wrap in quotes if needed
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }).join(',')
+  ).join('\r\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = (data.leagueName || 'league').replace(/[^a-z0-9]/gi, '_') + '_schedule.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// =============================================================================
+// Utilities
+// =============================================================================
+
+/** Show a status banner with a given message and type ('error'|'success'|'loading'). */
+function showStatus(msg, type) {
+  const banner = document.getElementById('statusBanner');
+  banner.textContent = msg;
+  banner.className = type;
+  banner.style.display = 'block';
+  if (type === 'success') {
+    setTimeout(() => { banner.style.display = 'none'; }, 5000);
+  }
+}
+
+/** Reset the form and clear results. */
+function resetForm() {
+  document.getElementById('resultsContainer').innerHTML = '';
+  document.getElementById('exportBar').classList.remove('visible');
+  document.getElementById('statusBanner').style.display = 'none';
+  document.getElementById('leagueTitle').textContent = 'Volleyball League Scheduler';
+  window._scheduleData = null;
+  // Rebuild team list
+  document.getElementById('teamsList').innerHTML = '';
+  defaultTeams.forEach(t => addTeamRow(t));
+  // Re-expand config
+  document.getElementById('configBody').classList.remove('hidden');
+  document.getElementById('configToggle').classList.remove('collapsed');
+}
+
+/** Escape HTML special characters for safe insertion. */
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Escape a string for use in an HTML attribute value. */
+function escapeAttr(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Format a "YYYY-MM-DD" date string to a readable form like "Tue, May 6, 2025". */
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', {
+      weekday: 'short', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+// =============================================================================
+// Initialisation
+// =============================================================================
+
+defaultTeams.forEach(t => addTeamRow(t));
+renderVenues(defaultVenues);
+</script>
+
+</body>
+</html>
