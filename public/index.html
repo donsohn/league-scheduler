@@ -138,7 +138,12 @@
     }
     textarea {
       resize: vertical;
-      min-height: 120px;
+      min-height: 80px;
+    }
+    small.hint {
+      font-size: 11px;
+      color: #888;
+      margin-top: 2px;
     }
 
     /* Venue rows */
@@ -163,6 +168,10 @@
       cursor: pointer;
       padding: 2px 6px;
     }
+
+    /* Playoff fields toggle */
+    .playoff-fields { transition: opacity .2s; }
+    .playoff-fields.hidden-soft { opacity: .3; pointer-events: none; }
 
     /* Buttons */
     .btn {
@@ -208,9 +217,28 @@
       background: #1a2742;
       color: #fff;
     }
+    .btn-danger {
+      background: #c0392b;
+      color: #fff;
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: #a93226;
+    }
+    .btn-warning {
+      background: #e67e22;
+      color: #fff;
+    }
+    .btn-warning:hover:not(:disabled) {
+      background: #ca6f1e;
+    }
     .btn-small {
       padding: 5px 12px;
       font-size: 12px;
+    }
+    .btn-icon {
+      padding: 3px 7px;
+      font-size: 13px;
+      line-height: 1;
     }
     .action-row {
       display: flex;
@@ -341,6 +369,9 @@
     table.schedule-table tbody tr:hover {
       background: #edf0fa;
     }
+    table.schedule-table tbody tr.match-scored {
+      background: #f0faf4 !important;
+    }
     table.schedule-table td {
       padding: 7px 12px;
       border-bottom: 1px solid #e8ecf4;
@@ -359,6 +390,7 @@
     .badge-div4  { background: #f8bbd0; color: #880e4f; }
     .badge-div5  { background: #e1bee7; color: #4a148c; }
     .badge-div6  { background: #b2dfdb; color: #004d40; }
+    .badge-ava   { background: #fff8e1; color: #f57f17; }
     .badge-qf    { background: #fff9c4; color: #827717; }
     .badge-sf    { background: #ffe0b2; color: #bf360c; }
     .badge-final { background: #ffcdd2; color: #b71c1c; }
@@ -371,6 +403,119 @@
     }
     .playoff-night-header:hover {
       background: #9c27b0;
+    }
+
+    /* -----------------------------------------------------------------------
+       Score Inputs
+    ----------------------------------------------------------------------- */
+    .score-input {
+      width: 52px;
+      padding: 4px 6px;
+      text-align: center;
+      font-size: 13px;
+      border: 1px solid #ccd2de;
+      border-radius: 4px;
+      background: #fafbfc;
+      font-family: inherit;
+      transition: border-color .15s;
+    }
+    .score-input:focus {
+      border-color: #3a6fce;
+      outline: none;
+      background: #fff;
+    }
+    .score-sep {
+      color: #999;
+      font-size: 12px;
+      padding: 0 2px;
+    }
+    .done-indicator {
+      color: #27ae60;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    /* Week save bar */
+    .week-save-bar {
+      padding: 10px 16px;
+      background: #f8f9fc;
+      border-top: 1px solid #e4e8f0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .week-save-feedback {
+      font-size: 12px;
+      color: #27ae60;
+      font-weight: 600;
+      display: none;
+    }
+    .week-save-feedback.visible {
+      display: inline;
+    }
+
+    /* -----------------------------------------------------------------------
+       Standings Tables
+    ----------------------------------------------------------------------- */
+    .standings-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      padding: 20px;
+    }
+    .standings-div-block {
+      flex: 1;
+      min-width: 280px;
+    }
+    .standings-div-block h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a2742;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #c5cfe8;
+    }
+    table.standings-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table.standings-table thead th {
+      background: #eef1f8;
+      color: #1a2742;
+      font-weight: 700;
+      text-align: center;
+      padding: 6px 8px;
+      border-bottom: 2px solid #c5cfe8;
+      white-space: nowrap;
+    }
+    table.standings-table thead th:first-child,
+    table.standings-table thead th:nth-child(2) {
+      text-align: left;
+    }
+    table.standings-table tbody td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #e8ecf4;
+      text-align: center;
+      white-space: nowrap;
+    }
+    table.standings-table tbody td:nth-child(2) {
+      text-align: left;
+    }
+    table.standings-table tbody tr:nth-child(even) {
+      background: #f8f9fc;
+    }
+    table.standings-table tbody tr.standings-gold {
+      background: #fffde7 !important;
+    }
+    table.standings-table tbody tr.standings-gold td {
+      font-weight: 700;
+    }
+    table.standings-table tbody tr.standings-gold td:nth-child(2) {
+      color: #e65100;
     }
 
     /* -----------------------------------------------------------------------
@@ -388,13 +533,97 @@
     }
 
     /* -----------------------------------------------------------------------
+       Relegation Banner
+    ----------------------------------------------------------------------- */
+    .relegation-banner {
+      display: none;
+      background: #e6f4ea;
+      color: #1b5e20;
+      border-left: 4px solid #27ae60;
+      border-radius: 6px;
+      padding: 12px 18px;
+      margin-bottom: 16px;
+      font-weight: 500;
+      line-height: 1.6;
+    }
+
+    /* Finalized badge inside week header */
+    .finalized-badge {
+      display: inline-block;
+      background: #27ae60;
+      color: #fff;
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+
+    /* -----------------------------------------------------------------------
+       Modal Overlay
+    ----------------------------------------------------------------------- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .modal-overlay.visible {
+      display: block;
+    }
+    .modal-box {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.25);
+      max-width: 520px;
+      margin: 60px auto;
+      overflow: hidden;
+    }
+    .modal-box .modal-header {
+      background: #1a2742;
+      color: #fff;
+      padding: 14px 20px;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-box .modal-header button.close-modal {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 4px;
+    }
+    .modal-box .modal-body {
+      padding: 20px;
+    }
+    .modal-warnings {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #c0392b;
+      background: #fce8e6;
+      border-radius: 4px;
+      padding: 8px 12px;
+      display: none;
+    }
+    .modal-warnings.visible {
+      display: block;
+    }
+
+    /* -----------------------------------------------------------------------
        Print styles
     ----------------------------------------------------------------------- */
     @media print {
       header, #configCard, #exportBar, #statusBanner,
-      .btn, .week-header .chev, .card-header .toggle-icon {
-        display: none !important;
-      }
+      .btn, .week-header .chev, .card-header .toggle-icon,
+      .week-save-bar, .modal-overlay { display: none !important; }
       body { background: #fff; font-size: 11px; }
       main { max-width: 100%; margin: 0; padding: 0; }
       .card { box-shadow: none; border: 1px solid #ccc; }
@@ -405,7 +634,6 @@
       .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .week-note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       a { text-decoration: none; }
-      /* Page breaks between weeks */
       .week-card { page-break-inside: avoid; }
     }
   </style>
@@ -425,11 +653,15 @@
   <!-- Status Banner -->
   <div id="statusBanner"></div>
 
+  <!-- Relegation Summary Banner -->
+  <div id="relegationBanner" class="relegation-banner"></div>
+
   <!-- Export Bar (shown after generation) -->
   <div id="exportBar">
     <strong>Export:</strong>
     <button class="btn btn-success btn-small" onclick="exportCSV()">&#8681; Download CSV</button>
     <button class="btn btn-outline btn-small" onclick="window.print()">&#128438; Print / Save PDF</button>
+    <button class="btn btn-danger btn-small" onclick="newLeague()" style="margin-left:auto;">&#10006; New League</button>
   </div>
 
   <!-- Configuration Card -->
@@ -446,6 +678,16 @@
           <div class="form-group span2">
             <label for="leagueName">League Name</label>
             <input type="text" id="leagueName" value="Tuesday Volleyball League" />
+          </div>
+
+          <!-- Schedule Format -->
+          <div class="form-group span2">
+            <label for="scheduleFormat">Schedule Format</label>
+            <select id="scheduleFormat">
+              <option value="Divisional with Relegation">Divisional with Relegation</option>
+              <option value="All-vs-All Round Robin">All-vs-All Round Robin</option>
+            </select>
+            <small class="hint">All-vs-All: every team plays every other team. Each game night, each team plays 2 back-to-back matches.</small>
           </div>
 
           <!-- Teams -->
@@ -470,14 +712,13 @@
             <input type="number" id="numWeeks" min="1" max="20" value="4" />
           </div>
 
-          <!-- Playoff Date 1 -->
-          <div class="form-group">
+          <!-- Playoff dates (hidden in All-vs-All mode) -->
+          <div class="form-group playoff-fields" id="playoffField1">
             <label for="playoffDate1">Playoff Night 1 (QF + SF)</label>
             <input type="date" id="playoffDate1" value="2026-06-02" />
           </div>
 
-          <!-- Playoff Date 2 -->
-          <div class="form-group">
+          <div class="form-group playoff-fields" id="playoffField2">
             <label for="playoffDate2">Playoff Night 2 (Finals + Playdowns)</label>
             <input type="date" id="playoffDate2" value="2026-06-09" />
           </div>
@@ -505,6 +746,20 @@
             </div>
           </div>
 
+          <!-- Blackout Dates -->
+          <div class="form-group span2">
+            <label for="blackoutDates">Blackout Dates (comma-separated YYYY-MM-DD)</label>
+            <input type="text" id="blackoutDates" placeholder="2026-05-19, 2026-06-16" />
+            <small class="hint">Game nights falling on these dates will be moved to the following week.</small>
+          </div>
+
+          <!-- Team Conflicts -->
+          <div class="form-group span2">
+            <label for="teamConflicts">Team Time Conflicts (JSON)</label>
+            <textarea id="teamConflicts" rows="3" placeholder='{"Team Alpha": {"global": ["18:30"], "dates": {"2026-05-20": ["18:30"]}}}'></textarea>
+            <small class="hint">Hard constraints: teams will not be scheduled at these times. Format: { "Team": { "global": ["HH:MM"], "dates": { "YYYY-MM-DD": ["HH:MM"] } } }</small>
+          </div>
+
         </div><!-- /.form-grid -->
 
         <div class="action-row" style="margin-top:20px;">
@@ -518,9 +773,103 @@
   <!-- Results Container -->
   <div id="resultsContainer"></div>
 
+  <!-- Standings Container -->
+  <div id="standingsContainer"></div>
+
 </main>
 
+<!-- =========================================================================
+     MODAL: Edit Match
+========================================================================= -->
+<div id="editMatchModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      &#9998; Edit Match
+      <button class="close-modal" onclick="closeEditModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="editDate">Date</label>
+          <input type="date" id="editDate" />
+        </div>
+        <div class="form-group">
+          <label for="editTime">Time</label>
+          <input type="time" id="editTime" />
+        </div>
+        <div class="form-group">
+          <label for="editTeamA">Home Team</label>
+          <input type="text" id="editTeamA" />
+        </div>
+        <div class="form-group">
+          <label for="editTeamB">Away Team</label>
+          <input type="text" id="editTeamB" />
+        </div>
+        <div class="form-group">
+          <label for="editVenue">Venue</label>
+          <input type="text" id="editVenue" />
+        </div>
+        <div class="form-group">
+          <label for="editCourt">Court</label>
+          <input type="number" id="editCourt" min="1" />
+        </div>
+      </div>
+      <div class="action-row" style="margin-top:18px;">
+        <button class="btn btn-primary" onclick="submitEditMatch()">Save Changes</button>
+        <button class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================================
+     MODAL: Reschedule Night (Court Reduction)
+========================================================================= -->
+<div id="rescheduleModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:380px;">
+    <div class="modal-header">
+      &#9881; Reschedule Night with Fewer Courts
+      <button class="close-modal" onclick="closeRescheduleModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:14px;font-size:13px;">
+        Reduce courts for <strong>Week <span id="rescheduleWeekLabel"></span></strong>.
+        Matchups are preserved; times and courts will be reassigned.
+      </p>
+      <div class="form-group">
+        <label for="rescheduleCourtCount">New Total Court Count</label>
+        <input type="number" id="rescheduleCourtCount" min="1" value="2" />
+      </div>
+      <div class="action-row" style="margin-top:18px;">
+        <button class="btn btn-warning" onclick="submitReschedule()">Reschedule</button>
+        <button class="btn btn-secondary" onclick="closeRescheduleModal()">Cancel</button>
+      </div>
+      <div id="rescheduleWarnings" class="modal-warnings"></div>
+    </div>
+  </div>
+</div>
+
 <script>
+// =============================================================================
+// State
+// =============================================================================
+
+/** Master state: { schedule, scores, standings, generateConfig } */
+window._leagueState = null;
+let _editWeekNum = null;
+let _editMatchIdx = null;
+let _rescheduleWeekNum = null;
+
+// =============================================================================
+// Schedule format toggle
+// =============================================================================
+
+document.getElementById('scheduleFormat').addEventListener('change', function() {
+  const isAva = this.value === 'All-vs-All Round Robin';
+  document.getElementById('playoffField1').classList.toggle('hidden-soft', isAva);
+  document.getElementById('playoffField2').classList.toggle('hidden-soft', isAva);
+});
+
 // =============================================================================
 // Team rows
 // =============================================================================
@@ -585,7 +934,7 @@ const defaultVenues = [
 function renderVenues(venues) {
   const container = document.getElementById('venueContainer');
   container.innerHTML = '';
-  venues.forEach((v, i) => addVenueRow(v.name, v.courts));
+  venues.forEach((v) => addVenueRow(v.name, v.courts));
 }
 
 function addVenueRow(name = '', courts = 2) {
@@ -645,7 +994,6 @@ async function generateSchedule() {
   btn.disabled = true;
   showStatus('Generating schedule…', 'loading');
 
-  // Collect teams
   const rawTeams = getTeams();
 
   if (rawTeams.length < 3) {
@@ -666,16 +1014,38 @@ async function generateSchedule() {
     return;
   }
 
+  // Parse team conflicts JSON
+  let teamConflicts = {};
+  const conflictRaw = document.getElementById('teamConflicts').value.trim();
+  if (conflictRaw) {
+    try {
+      teamConflicts = JSON.parse(conflictRaw);
+    } catch (e) {
+      showStatus('Team Conflicts field is not valid JSON. Please check the format.', 'error');
+      btn.disabled = false;
+      return;
+    }
+  }
+
+  // Parse blackout dates
+  const blackoutDates = document.getElementById('blackoutDates').value
+    .split(',').map(s => s.trim()).filter(Boolean);
+
+  const scheduleFormat = document.getElementById('scheduleFormat').value;
+
   const payload = {
     teams:           rawTeams,
     leagueName:      document.getElementById('leagueName').value.trim() || 'Volleyball League',
     seasonStartDate: document.getElementById('seasonStart').value,
     numWeeks:        parseInt(document.getElementById('numWeeks').value, 10) || 4,
-    playoffDate1:    document.getElementById('playoffDate1').value || null,
-    playoffDate2:    document.getElementById('playoffDate2').value || null,
+    playoffDate1:    scheduleFormat === 'All-vs-All Round Robin' ? null : (document.getElementById('playoffDate1').value || null),
+    playoffDate2:    scheduleFormat === 'All-vs-All Round Robin' ? null : (document.getElementById('playoffDate2').value || null),
     venues,
     startTime:       document.getElementById('startTime').value || '18:30',
     slotDuration:    parseInt(document.getElementById('slotDuration').value, 10) || 35,
+    scheduleFormat,
+    teamConflicts,
+    blackoutDates,
   };
 
   try {
@@ -692,11 +1062,23 @@ async function generateSchedule() {
       return;
     }
 
-    // Store for export
-    window._scheduleData = data;
+    // Init state
+    window._leagueState = { schedule: data, scores: {}, standings: {}, generateConfig: payload };
 
-    // Render
-    renderResults(data);
+    // Save to server
+    await fetch('/api/state/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(window._leagueState),
+    });
+
+    // Fetch standings and render
+    const standingsRes = await fetch('/api/standings');
+    const standings = standingsRes.ok ? await standingsRes.json() : {};
+    window._leagueState.standings = standings;
+
+    renderResults(data, {});
+    renderStandings(standings);
     document.getElementById('leagueTitle').textContent = data.leagueName || 'Volleyball League Scheduler';
     showStatus(`Schedule generated: ${data.weeks.length} regular season week(s)` +
       (data.playoffs ? ' + playoffs.' : '.'), 'success');
@@ -717,19 +1099,222 @@ async function generateSchedule() {
 }
 
 // =============================================================================
+// Score Entry
+// =============================================================================
+
+async function saveWeekScores(weekNum) {
+  const feedbackEl = document.getElementById(`save-feedback-${weekNum}`);
+  const btn = document.getElementById(`save-btn-${weekNum}`);
+  if (btn) btn.disabled = true;
+
+  const inputs = document.querySelectorAll(`input.score-input[data-week-num="${weekNum}"]`);
+  const matchMap = {};
+
+  inputs.forEach(input => {
+    const idx = input.dataset.matchIdx;
+    const side = input.dataset.side;
+    if (idx === undefined || idx === '') return;
+    if (!matchMap[idx]) matchMap[idx] = {};
+    matchMap[idx][side] = input.value.trim();
+  });
+
+  const existingScores = (window._leagueState || {}).scores || {};
+  const updates = Object.entries(matchMap)
+    .filter(([idx, v]) => {
+      if (idx === 'undefined' || idx === undefined) return false;
+      if (v.a === '' || v.b === '') return false;
+      const key = `week_${weekNum}_match_${idx}`;
+      if (Number(v.a) === 0 && Number(v.b) === 0 && !existingScores[key]) return false;
+      return true;
+    })
+    .map(([idx, v]) => ({ matchIndex: parseInt(idx, 10), scoreA: Number(v.a), scoreB: Number(v.b) }));
+
+  if (updates.length === 0) {
+    showStatus('Enter scores for at least one match (both home and away).', 'error');
+    if (btn) btn.disabled = false;
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/scores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weekNum, updates }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+
+    if (!window._leagueState.scores) window._leagueState.scores = {};
+    for (const upd of updates) {
+      window._leagueState.scores[`week_${weekNum}_match_${upd.matchIndex}`] = {
+        scoreA: upd.scoreA, scoreB: upd.scoreB,
+      };
+    }
+
+    if (data.standings) {
+      window._leagueState.standings = data.standings;
+      renderStandings(data.standings);
+      const sc = document.getElementById('standingsCard');
+      if (sc) sc.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    if (data.playoffs && window._leagueState.schedule) {
+      window._leagueState.schedule.playoffs = data.playoffs;
+      refreshPlayoffSection(data.playoffs);
+    }
+
+    updateScoredRows(weekNum);
+
+    if (feedbackEl) {
+      feedbackEl.textContent = `✓ ${updates.length} score${updates.length !== 1 ? 's' : ''} saved`;
+      feedbackEl.classList.add('visible');
+      setTimeout(() => feedbackEl.classList.remove('visible'), 3000);
+    }
+
+  } catch (err) {
+    showStatus('Error saving scores: ' + err.message, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function updateScoredRows(weekNum) {
+  const scores = (window._leagueState || {}).scores || {};
+  document.querySelectorAll(`tr[data-week-num="${weekNum}"]`).forEach(tr => {
+    const idx = tr.dataset.matchIdx;
+    const key = `week_${weekNum}_match_${idx}`;
+    if (scores[key]) {
+      tr.classList.add('match-scored');
+      const doneCell = tr.querySelector('.done-indicator');
+      if (doneCell) doneCell.textContent = '✓';
+    }
+  });
+}
+
+function populateScoreInputs(scores) {
+  if (!scores) return;
+  Object.entries(scores).forEach(([key, score]) => {
+    const m = key.match(/^week_(\d+)_match_(\d+)$/);
+    if (!m) return;
+    const [, weekNum, matchIdx] = m;
+    const inputA = document.querySelector(`[data-week-num="${weekNum}"][data-match-idx="${matchIdx}"][data-side="a"]`);
+    const inputB = document.querySelector(`[data-week-num="${weekNum}"][data-match-idx="${matchIdx}"][data-side="b"]`);
+    if (inputA) inputA.value = score.scoreA;
+    if (inputB) inputB.value = score.scoreB;
+    const tr = document.querySelector(`tr[data-week-num="${weekNum}"][data-match-idx="${matchIdx}"]`);
+    if (tr) {
+      tr.classList.add('match-scored');
+      const doneCell = tr.querySelector('.done-indicator');
+      if (doneCell) doneCell.textContent = '✓';
+    }
+  });
+}
+
+// =============================================================================
+// Standings Rendering
+// =============================================================================
+
+function renderStandings(standings) {
+  const container = document.getElementById('standingsContainer');
+  if (!standings || Object.keys(standings).length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  let standingsCard = document.getElementById('standingsCard');
+  if (standingsCard) standingsCard.remove();
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'standingsCard';
+
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  header.innerHTML = '&#127942; Standings <span class="toggle-icon">&#9660;</span>';
+  header.addEventListener('click', () => {
+    body.classList.toggle('hidden');
+    header.classList.toggle('collapsed');
+  });
+
+  const body = document.createElement('div');
+  body.className = 'card-body';
+  body.style.padding = '0';
+
+  const grid = document.createElement('div');
+  grid.className = 'standings-grid';
+
+  const divNames = Object.keys(standings).sort((a, b) => {
+    const na = parseInt(a.replace(/\D/g, ''), 10) || 0;
+    const nb = parseInt(b.replace(/\D/g, ''), 10) || 0;
+    return na - nb;
+  });
+
+  divNames.forEach(divName => {
+    const rows = standings[divName];
+    const block = document.createElement('div');
+    block.className = 'standings-div-block';
+    block.innerHTML = `<h4>${esc(divName)}</h4>`;
+
+    const table = document.createElement('table');
+    table.className = 'standings-table';
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th style="width:30px">Pos</th>
+          <th>Team</th>
+          <th title="Games Played">GP</th>
+          <th title="Wins">W</th>
+          <th title="Losses">L</th>
+          <th title="Points For">PF</th>
+          <th title="Points Against">PA</th>
+          <th title="Points">Pts</th>
+        </tr>
+      </thead>
+    `;
+    const tbody = document.createElement('tbody');
+    rows.forEach((row, i) => {
+      const tr = document.createElement('tr');
+      if (i === 0) tr.className = 'standings-gold';
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${esc(row.team)}</td>
+        <td>${row.GP}</td>
+        <td>${row.W}</td>
+        <td>${row.L}</td>
+        <td>${row.PF}</td>
+        <td>${row.PA}</td>
+        <td><strong>${row.Pts}</strong></td>
+      `;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    block.appendChild(table);
+    grid.appendChild(block);
+  });
+
+  body.appendChild(grid);
+  card.appendChild(header);
+  card.appendChild(body);
+  container.appendChild(card);
+}
+
+// =============================================================================
 // Rendering
 // =============================================================================
 
-function renderResults(data) {
+function renderResults(data, scores) {
   const container = document.getElementById('resultsContainer');
   container.innerHTML = '';
+  document.getElementById('standingsContainer').innerHTML = '';
 
   // Divisions summary
   if (data.divisions && data.divisions.length) {
-    const divCard = createCard('Division Assignments');
+    const isAva = data.scheduleFormat === 'All-vs-All Round Robin';
+    const title = isAva ? 'All Teams (All-vs-All Round Robin)' : 'Division Assignments';
+    const divCard = createCard(title);
     const grid = document.createElement('div');
     grid.className = 'divisions-grid';
-    data.divisions.forEach((div, i) => {
+    data.divisions.forEach((div) => {
       const box = document.createElement('div');
       box.className = 'division-box';
       box.innerHTML = `<h4>${esc(div.name)}</h4><ul>` +
@@ -752,18 +1337,43 @@ function renderResults(data) {
 
   // Playoffs
   if (data.playoffs) {
-    const pfCard = createCard('Playoffs');
-    if (data.playoffs.night1) {
-      pfCard.body.appendChild(buildNightSection(data.playoffs.night1, 'Playoff Night 1'));
-    }
-    if (data.playoffs.night2) {
-      pfCard.body.appendChild(buildNightSection(data.playoffs.night2, 'Playoff Night 2'));
-    }
-    container.appendChild(pfCard.card);
+    renderPlayoffCard(data.playoffs, container);
+  }
+
+  // Restore scores in inputs
+  if (scores && Object.keys(scores).length > 0) {
+    populateScoreInputs(scores);
   }
 }
 
-/** Create a collapsible card with a given title. Returns { card, body }. */
+function renderPlayoffCard(playoffs, container) {
+  let pfCard = document.getElementById('playoffCard');
+  if (pfCard) pfCard.remove();
+
+  const card = createCard('Playoffs');
+  card.card.id = 'playoffCard';
+  if (playoffs.night1) {
+    card.body.appendChild(buildNightSection(playoffs.night1, 'Playoff Night 1'));
+  }
+  if (playoffs.night2) {
+    card.body.appendChild(buildNightSection(playoffs.night2, 'Playoff Night 2'));
+  }
+  (container || document.getElementById('resultsContainer')).appendChild(card.card);
+}
+
+function refreshPlayoffSection(playoffs) {
+  const existing = document.getElementById('playoffCard');
+  if (!existing) {
+    renderPlayoffCard(playoffs, document.getElementById('resultsContainer'));
+    return;
+  }
+  const newCard = createCard('Playoffs');
+  newCard.card.id = 'playoffCard';
+  if (playoffs.night1) newCard.body.appendChild(buildNightSection(playoffs.night1, 'Playoff Night 1'));
+  if (playoffs.night2) newCard.body.appendChild(buildNightSection(playoffs.night2, 'Playoff Night 2'));
+  existing.replaceWith(newCard.card);
+}
+
 function createCard(title) {
   const card = document.createElement('div');
   card.className = 'card';
@@ -785,15 +1395,18 @@ function createCard(title) {
   return { card, body };
 }
 
-/** Build a collapsible week section (header + note + table). */
 function buildWeekSection(week) {
   const wrapper = document.createElement('div');
   wrapper.className = 'week-card';
 
+  const finalized = ((window._leagueState || {}).finalizedWeeks || []).includes(week.weekNum);
+  const scheduleFormat = ((window._leagueState || {}).schedule || {}).scheduleFormat || 'Divisional with Relegation';
+  const numDivs = (((window._leagueState || {}).schedule || {}).divisions || []).length;
+
   const header = document.createElement('div');
   header.className = 'week-header';
   header.innerHTML = `
-    <span>Week ${week.weekNum} &mdash; ${formatDate(week.date)}</span>
+    <span>Week ${week.weekNum} &mdash; ${formatDate(week.date)}${finalized ? '<span class="finalized-badge">&#10003; Finalized</span>' : ''}</span>
     <span class="week-meta">${week.matches.length} match${week.matches.length !== 1 ? 'es' : ''}</span>
     <span class="chev">&#9660;</span>
   `;
@@ -808,7 +1421,45 @@ function buildWeekSection(week) {
     body.appendChild(note);
   }
 
-  body.appendChild(buildMatchTable(week.matches));
+  body.appendChild(buildMatchTable(week.matches, { weekNum: week.weekNum }));
+
+  // Save scores bar
+  const saveBar = document.createElement('div');
+  saveBar.className = 'week-save-bar';
+  saveBar.innerHTML = `
+    <button class="btn btn-success btn-small" id="save-btn-${week.weekNum}"
+      onclick="saveWeekScores(${week.weekNum})">&#128190; Save Scores for Week ${week.weekNum}</button>
+    <span class="week-save-feedback" id="save-feedback-${week.weekNum}"></span>
+    <button class="btn btn-warning btn-small" onclick="openRescheduleModal(${week.weekNum})" style="margin-left:auto;">
+      &#9881; Reschedule Night
+    </button>
+  `;
+  body.appendChild(saveBar);
+
+  // Finalize bar (divisional mode only)
+  if (scheduleFormat !== 'All-vs-All Round Robin') {
+    const finalizeBar = document.createElement('div');
+    finalizeBar.className = 'week-save-bar';
+    if (finalized) {
+      finalizeBar.innerHTML = `<span style="color:#27ae60;font-weight:700;font-size:13px;">&#10003; Week ${week.weekNum} Finalized</span>`;
+    } else if (numDivs <= 1) {
+      finalizeBar.innerHTML = `
+        <button class="btn btn-secondary btn-small" disabled
+          title="Single division — no relegation possible">
+          &#127937; Finalize Week ${week.weekNum} &amp; Apply Relegation
+        </button>
+        <span style="font-size:12px;color:#888;margin-left:6px;">Single division — no relegation</span>
+      `;
+    } else {
+      finalizeBar.innerHTML = `
+        <button class="btn btn-secondary btn-small" id="finalize-btn-${week.weekNum}"
+          onclick="finalizeWeek(${week.weekNum})">
+          &#127937; Finalize Week ${week.weekNum} &amp; Apply Relegation
+        </button>
+      `;
+    }
+    body.appendChild(finalizeBar);
+  }
 
   header.addEventListener('click', () => {
     body.classList.toggle('hidden');
@@ -820,7 +1471,6 @@ function buildWeekSection(week) {
   return wrapper;
 }
 
-/** Build a collapsible playoff night section. */
 function buildNightSection(night, title) {
   const wrapper = document.createElement('div');
   wrapper.className = 'week-card';
@@ -835,7 +1485,7 @@ function buildNightSection(night, title) {
 
   const body = document.createElement('div');
   body.className = 'week-body';
-  body.appendChild(buildMatchTable(night.matches, true));
+  body.appendChild(buildMatchTable(night.matches, { isPlayoff: true }));
 
   header.addEventListener('click', () => {
     body.classList.toggle('hidden');
@@ -847,47 +1497,88 @@ function buildNightSection(night, title) {
   return wrapper;
 }
 
-/** Build the schedule table from a matches array. */
-function buildMatchTable(matches, isPlayoff = false) {
+/**
+ * Build the schedule table from a matches array.
+ * options: { isPlayoff, weekNum }
+ */
+function buildMatchTable(matches, options = {}) {
+  const { isPlayoff = false, weekNum = null } = options;
+
   const table = document.createElement('table');
   table.className = 'schedule-table';
 
   const thead = document.createElement('thead');
-  thead.innerHTML = `<tr>
-    <th>Time</th>
-    <th>Venue</th>
-    <th>Court</th>
-    <th>${isPlayoff ? 'Round' : 'Division'}</th>
-    <th>Home Team</th>
-    <th>Away Team</th>
-    ${isPlayoff ? '<th>Note</th>' : '<th>Score (Home)</th><th>Score (Away)</th>'}
-  </tr>`;
+  if (isPlayoff) {
+    thead.innerHTML = `<tr>
+      <th>Time</th><th>Venue</th><th>Court</th>
+      <th>Round</th><th>Home Team</th><th>Away Team</th><th>Note</th>
+    </tr>`;
+  } else {
+    thead.innerHTML = `<tr>
+      <th>Time</th><th>Venue</th><th>Court</th>
+      <th>Division</th><th>Home</th><th>Away</th>
+      <th style="text-align:center">H</th>
+      <th style="text-align:center">A</th>
+      <th style="text-align:center">&#10003;</th>
+      <th style="text-align:center" title="Edit match">&#9998;</th>
+    </tr>`;
+  }
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
-  matches.forEach(m => {
+  matches.forEach((m, matchIndex) => {
     const tr = document.createElement('tr');
+    if (!isPlayoff && weekNum !== null) {
+      tr.dataset.weekNum = weekNum;
+      tr.dataset.matchIdx = matchIndex;
+    }
+
     const divLabel = isPlayoff ? (m.round || '') : (m.division || '');
     const badgeClass = getBadgeClass(divLabel, isPlayoff);
-    tr.innerHTML = `
-      <td>${esc(m.time || '')}</td>
-      <td>${esc(m.venue || '')}</td>
-      <td>${esc(String(m.court || ''))}</td>
-      <td><span class="badge ${badgeClass}">${esc(divLabel)}</span></td>
-      <td>${esc(m.teamA || '')}</td>
-      <td>${esc(m.teamB || '')}</td>
-      ${isPlayoff
-        ? `<td style="font-size:11px;color:#666;">${esc(m.note || '')}</td>`
-        : '<td></td><td></td>'}
-    `;
+
+    if (isPlayoff) {
+      tr.innerHTML = `
+        <td>${esc(m.time || '')}</td>
+        <td>${esc(m.venue || '')}</td>
+        <td>${esc(String(m.court || ''))}</td>
+        <td><span class="badge ${badgeClass}">${esc(divLabel)}</span></td>
+        <td>${esc(m.teamA || '')}</td>
+        <td>${esc(m.teamB || '')}</td>
+        <td style="font-size:11px;color:#666;">${esc(m.note || '')}</td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td>${esc(m.time || '')}</td>
+        <td>${esc(m.venue || '')}</td>
+        <td>${esc(String(m.court || ''))}</td>
+        <td><span class="badge ${badgeClass}">${esc(divLabel)}</span></td>
+        <td>${esc(m.teamA || '')}</td>
+        <td>${esc(m.teamB || '')}</td>
+        <td style="text-align:center">
+          <input type="number" min="0" max="99" class="score-input"
+            data-week-num="${weekNum}" data-match-idx="${matchIndex}" data-side="a"
+            placeholder="0" />
+        </td>
+        <td style="text-align:center">
+          <input type="number" min="0" max="99" class="score-input"
+            data-week-num="${weekNum}" data-match-idx="${matchIndex}" data-side="b"
+            placeholder="0" />
+        </td>
+        <td style="text-align:center"><span class="done-indicator"></span></td>
+        <td style="text-align:center">
+          <button class="btn btn-secondary btn-icon" title="Edit match"
+            onclick="openEditModal(${weekNum}, ${matchIndex})">&#9998;</button>
+        </td>
+      `;
+    }
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
   return table;
 }
 
-/** Return a CSS badge class based on division name or round. */
 function getBadgeClass(label, isPlayoff) {
+  if (!isPlayoff && label === 'All vs All') return 'badge-ava';
   if (isPlayoff) {
     const l = label.toLowerCase();
     if (l === 'qf')          return 'badge-qf';
@@ -906,30 +1597,136 @@ function getBadgeClass(label, isPlayoff) {
 }
 
 // =============================================================================
+// New League / Reset
+// =============================================================================
+
+async function newLeague() {
+  if (!confirm('Start a new league? This will clear all scores and standings.')) return;
+
+  await fetch('/api/state/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: 'null',
+  });
+
+  window._leagueState = null;
+  resetForm();
+}
+
+function resetForm() {
+  document.getElementById('resultsContainer').innerHTML = '';
+  document.getElementById('standingsContainer').innerHTML = '';
+  document.getElementById('exportBar').classList.remove('visible');
+  document.getElementById('statusBanner').style.display = 'none';
+  document.getElementById('leagueTitle').textContent = 'Volleyball League Scheduler';
+
+  document.getElementById('teamsList').innerHTML = '';
+  defaultTeams.forEach(t => addTeamRow(t));
+  renderVenues(defaultVenues);
+  document.getElementById('teamConflicts').value = '';
+  document.getElementById('blackoutDates').value = '';
+  document.getElementById('scheduleFormat').value = 'Divisional with Relegation';
+  document.getElementById('playoffField1').classList.remove('hidden-soft');
+  document.getElementById('playoffField2').classList.remove('hidden-soft');
+
+  document.getElementById('configBody').classList.remove('hidden');
+  document.getElementById('configToggle').classList.remove('collapsed');
+}
+
+// =============================================================================
+// State Restoration on Page Load
+// =============================================================================
+
+async function restoreStateOnLoad() {
+  try {
+    const res = await fetch('/api/state/load');
+    const state = await res.json();
+    if (!state || !state.schedule) return;
+
+    window._leagueState = state;
+
+    const cfg = state.generateConfig || {};
+    if (cfg.leagueName) document.getElementById('leagueName').value = cfg.leagueName;
+    if (cfg.seasonStartDate) document.getElementById('seasonStart').value = cfg.seasonStartDate;
+    if (cfg.numWeeks) document.getElementById('numWeeks').value = cfg.numWeeks;
+    if (cfg.playoffDate1) document.getElementById('playoffDate1').value = cfg.playoffDate1;
+    if (cfg.playoffDate2) document.getElementById('playoffDate2').value = cfg.playoffDate2;
+    if (cfg.startTime) document.getElementById('startTime').value = cfg.startTime;
+    if (cfg.slotDuration) document.getElementById('slotDuration').value = cfg.slotDuration;
+    if (cfg.venues && cfg.venues.length) renderVenues(cfg.venues);
+    if (cfg.teams && cfg.teams.length) {
+      document.getElementById('teamsList').innerHTML = '';
+      cfg.teams.forEach(t => addTeamRow(t));
+    }
+    if (cfg.scheduleFormat) {
+      document.getElementById('scheduleFormat').value = cfg.scheduleFormat;
+      if (cfg.scheduleFormat === 'All-vs-All Round Robin') {
+        document.getElementById('playoffField1').classList.add('hidden-soft');
+        document.getElementById('playoffField2').classList.add('hidden-soft');
+      }
+    }
+    if (cfg.teamConflicts && Object.keys(cfg.teamConflicts).length > 0) {
+      document.getElementById('teamConflicts').value = JSON.stringify(cfg.teamConflicts, null, 2);
+    }
+    if (cfg.blackoutDates && cfg.blackoutDates.length > 0) {
+      document.getElementById('blackoutDates').value = cfg.blackoutDates.join(', ');
+    }
+
+    renderResults(state.schedule, state.scores || {});
+    document.getElementById('leagueTitle').textContent =
+      state.schedule.leagueName || 'Volleyball League Scheduler';
+    document.getElementById('exportBar').classList.add('visible');
+
+    document.getElementById('configBody').classList.add('hidden');
+    document.getElementById('configToggle').classList.add('collapsed');
+
+    if (state.standings && Object.keys(state.standings).length > 0) {
+      renderStandings(state.standings);
+    }
+
+    showStatus('Previous league session restored.', 'success');
+  } catch (e) {
+    // No state or network error — fresh start is fine
+  }
+}
+
+// =============================================================================
 // CSV Export
 // =============================================================================
 
 function exportCSV() {
-  const data = window._scheduleData;
+  const data = (window._leagueState || {}).schedule;
   if (!data) return;
 
-  const rows = [
-    ['Date', 'Time', 'Venue', 'Court', 'Division', 'Home Team', 'Away Team', 'Game 1 Score Home', 'Game 1 Score Away']
-  ];
+  const scores = (window._leagueState || {}).scores || {};
 
-  // Regular season
+  // Column names (easy to update here)
+  const CSV_COLUMNS = ['Date', 'Time', 'Home Team', 'Away Team', 'Venue', 'Court', 'Score Home', 'Score Away'];
+
+  const rows = [CSV_COLUMNS];
+
   (data.weeks || []).forEach(week => {
-    (week.matches || []).forEach(m => {
-      rows.push([week.date, m.time, m.venue, m.court, m.division, m.teamA, m.teamB, '', '']);
+    (week.matches || []).forEach((m, idx) => {
+      const key = `week_${week.weekNum}_match_${idx}`;
+      const s = scores[key] || {};
+      rows.push([
+        week.date,
+        m.time,
+        m.teamA,
+        m.teamB,
+        m.venue,
+        m.court,
+        s.scoreA !== undefined ? s.scoreA : '',
+        s.scoreB !== undefined ? s.scoreB : '',
+      ]);
     });
   });
 
-  // Playoffs
   if (data.playoffs) {
     [data.playoffs.night1, data.playoffs.night2].forEach(night => {
       if (!night) return;
       (night.matches || []).forEach(m => {
-        rows.push([night.date, m.time, m.venue, m.court, m.round, m.teamA, m.teamB, '', '']);
+        rows.push([night.date, m.time, m.teamA, m.teamB, m.venue, m.court, '', '']);
       });
     });
   }
@@ -937,7 +1734,6 @@ function exportCSV() {
   const csv = rows.map(row =>
     row.map(cell => {
       const s = String(cell == null ? '' : cell);
-      // Escape quotes and wrap in quotes if needed
       if (s.includes(',') || s.includes('"') || s.includes('\n')) {
         return '"' + s.replace(/"/g, '""') + '"';
       }
@@ -960,7 +1756,6 @@ function exportCSV() {
 // Utilities
 // =============================================================================
 
-/** Show a status banner with a given message and type ('error'|'success'|'loading'). */
 function showStatus(msg, type) {
   const banner = document.getElementById('statusBanner');
   banner.textContent = msg;
@@ -971,22 +1766,6 @@ function showStatus(msg, type) {
   }
 }
 
-/** Reset the form and clear results. */
-function resetForm() {
-  document.getElementById('resultsContainer').innerHTML = '';
-  document.getElementById('exportBar').classList.remove('visible');
-  document.getElementById('statusBanner').style.display = 'none';
-  document.getElementById('leagueTitle').textContent = 'Volleyball League Scheduler';
-  window._scheduleData = null;
-  // Rebuild team list
-  document.getElementById('teamsList').innerHTML = '';
-  defaultTeams.forEach(t => addTeamRow(t));
-  // Re-expand config
-  document.getElementById('configBody').classList.remove('hidden');
-  document.getElementById('configToggle').classList.remove('collapsed');
-}
-
-/** Escape HTML special characters for safe insertion. */
 function esc(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -995,14 +1774,12 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
-/** Escape a string for use in an HTML attribute value. */
 function escapeAttr(str) {
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;');
 }
 
-/** Format a "YYYY-MM-DD" date string to a readable form like "Tue, May 6, 2025". */
 function formatDate(dateStr) {
   if (!dateStr) return '';
   try {
@@ -1016,11 +1793,257 @@ function formatDate(dateStr) {
 }
 
 // =============================================================================
+// Week Finalization + Relegation
+// =============================================================================
+
+async function finalizeWeek(weekNum) {
+  const state = window._leagueState;
+  if (!state || !state.schedule) return;
+
+  const divisions = state.schedule.divisions || [];
+  const standings = state.standings || {};
+
+  if (divisions.length <= 1) {
+    alert('Single division — no relegation possible.');
+    return;
+  }
+
+  const previewLines = [];
+  for (let i = 0; i < divisions.length - 1; i++) {
+    const hDiv = divisions[i];
+    const lDiv = divisions[i + 1];
+    const hRows = standings[hDiv.name] || [];
+    const lRows = standings[lDiv.name]  || [];
+    if (hRows.length === 0 || lRows.length === 0) continue;
+    const relegated = hRows[hRows.length - 1].team;
+    const promoted  = lRows[0].team;
+    previewLines.push(`\u2B06\uFE0F ${promoted}: ${lDiv.name} \u2192 ${hDiv.name}`);
+    previewLines.push(`\u2B07\uFE0F ${relegated}: ${hDiv.name} \u2192 ${lDiv.name}`);
+  }
+
+  const confirmMsg = previewLines.length > 0
+    ? `Finalize Week ${weekNum}?\n\n${previewLines.join('\n')}\n\nFuture week schedules will be regenerated. Continue?`
+    : `Finalize Week ${weekNum}? Future week schedules will be regenerated. Continue?`;
+
+  if (!confirm(confirmMsg)) return;
+
+  const btn = document.getElementById(`finalize-btn-${weekNum}`);
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/finalize-week', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weekNum }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showStatus('Finalization error: ' + (data.error || 'Unknown error'), 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    const stateRes = await fetch('/api/state/load');
+    const newState = stateRes.ok ? await stateRes.json() : null;
+    if (newState) window._leagueState = newState;
+
+    renderResults(window._leagueState.schedule, window._leagueState.scores || {});
+    if (window._leagueState.standings) {
+      renderStandings(window._leagueState.standings);
+    }
+
+    populateScoreInputs(window._leagueState.scores || {});
+
+    const moves = [
+      ...(data.promotions || []).map(p => `\u2B06\uFE0F ${p.promoted}: ${p.from} \u2192 ${p.to}`),
+      ...(data.relegations || []).map(r => `\u2B07\uFE0F ${r.relegated}: ${r.from} \u2192 ${r.to}`),
+    ];
+    if (moves.length > 0) showRelegationBanner(moves);
+
+    showStatus(`Week ${weekNum} finalized. Future schedules rebuilt.`, 'success');
+
+  } catch (err) {
+    showStatus('Network error: ' + err.message, 'error');
+    if (btn) btn.disabled = false;
+  }
+}
+
+function showRelegationBanner(moves) {
+  const banner = document.getElementById('relegationBanner');
+  if (!banner) return;
+  banner.innerHTML = '<strong>Relegation Applied:</strong> ' +
+    moves.map(m => esc(m)).join(' &nbsp;|&nbsp; ');
+  banner.style.display = 'block';
+  setTimeout(() => { banner.style.display = 'none'; }, 15000);
+}
+
+// =============================================================================
+// Per-Match Edit Modal
+// =============================================================================
+
+function openEditModal(weekNum, matchIndex) {
+  const state = window._leagueState;
+  if (!state || !state.schedule) return;
+  const week = state.schedule.weeks.find(w => w.weekNum === weekNum);
+  if (!week) return;
+  const m = week.matches[matchIndex];
+  if (!m) return;
+
+  _editWeekNum = weekNum;
+  _editMatchIdx = matchIndex;
+
+  document.getElementById('editDate').value = m.date || '';
+  document.getElementById('editTime').value = m.time || '';
+  document.getElementById('editTeamA').value = m.teamA || '';
+  document.getElementById('editTeamB').value = m.teamB || '';
+  document.getElementById('editVenue').value = m.venue || '';
+  document.getElementById('editCourt').value = m.court || '';
+
+  document.getElementById('editMatchModal').classList.add('visible');
+}
+
+function closeEditModal() {
+  document.getElementById('editMatchModal').classList.remove('visible');
+  _editWeekNum = null;
+  _editMatchIdx = null;
+}
+
+async function submitEditMatch() {
+  if (_editWeekNum === null || _editMatchIdx === null) return;
+
+  const updates = {
+    date:  document.getElementById('editDate').value,
+    time:  document.getElementById('editTime').value,
+    teamA: document.getElementById('editTeamA').value.trim(),
+    teamB: document.getElementById('editTeamB').value.trim(),
+    venue: document.getElementById('editVenue').value.trim(),
+    court: document.getElementById('editCourt').value,
+  };
+
+  try {
+    const res = await fetch('/api/edit-match', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weekNum: _editWeekNum, matchIndex: _editMatchIdx, updates }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showStatus('Edit failed: ' + (data.error || 'Unknown error'), 'error');
+      return;
+    }
+
+    // Update local state
+    const week = window._leagueState.schedule.weeks.find(w => w.weekNum === _editWeekNum);
+    if (week && data.match) {
+      week.matches[_editMatchIdx] = { ...week.matches[_editMatchIdx], ...data.match };
+    }
+
+    // Re-render
+    renderResults(window._leagueState.schedule, window._leagueState.scores || {});
+    populateScoreInputs(window._leagueState.scores || {});
+
+    closeEditModal();
+    showStatus('Match updated successfully.', 'success');
+
+  } catch (err) {
+    showStatus('Network error: ' + err.message, 'error');
+  }
+}
+
+// =============================================================================
+// Court Reduction / Reschedule Night Modal
+// =============================================================================
+
+function openRescheduleModal(weekNum) {
+  _rescheduleWeekNum = weekNum;
+  document.getElementById('rescheduleWeekLabel').textContent = weekNum;
+  document.getElementById('rescheduleCourtCount').value = 2;
+  document.getElementById('rescheduleWarnings').textContent = '';
+  document.getElementById('rescheduleWarnings').classList.remove('visible');
+  document.getElementById('rescheduleModal').classList.add('visible');
+}
+
+function closeRescheduleModal() {
+  document.getElementById('rescheduleModal').classList.remove('visible');
+  _rescheduleWeekNum = null;
+}
+
+async function submitReschedule() {
+  if (_rescheduleWeekNum === null) return;
+
+  const newCourtCount = parseInt(document.getElementById('rescheduleCourtCount').value, 10);
+  if (!newCourtCount || newCourtCount < 1) {
+    showStatus('Please enter a valid court count (≥1).', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/reschedule-night', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weekNum: _rescheduleWeekNum, newCourtCount }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showStatus('Reschedule failed: ' + (data.error || 'Unknown error'), 'error');
+      return;
+    }
+
+    // Show warnings inside modal if any
+    if (data.warnings && data.warnings.length > 0) {
+      const warnEl = document.getElementById('rescheduleWarnings');
+      warnEl.textContent = data.warnings.join(' | ');
+      warnEl.classList.add('visible');
+    }
+
+    // Reload state and re-render
+    const stateRes = await fetch('/api/state/load');
+    const newState = stateRes.ok ? await stateRes.json() : null;
+    if (newState) {
+      window._leagueState = newState;
+      renderResults(newState.schedule, newState.scores || {});
+      populateScoreInputs(newState.scores || {});
+    }
+
+    showStatus(`Week ${_rescheduleWeekNum} rescheduled to ${newCourtCount} court(s).`, 'success');
+
+    if (!data.warnings || data.warnings.length === 0) {
+      closeRescheduleModal();
+    }
+
+  } catch (err) {
+    showStatus('Network error: ' + err.message, 'error');
+  }
+}
+
+// =============================================================================
+// Keyboard: close modals on Escape
+// =============================================================================
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeEditModal();
+    closeRescheduleModal();
+  }
+});
+
+// Close modal on overlay click (outside the box)
+document.getElementById('editMatchModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
+document.getElementById('rescheduleModal').addEventListener('click', function(e) {
+  if (e.target === this) closeRescheduleModal();
+});
+
+// =============================================================================
 // Initialisation
 // =============================================================================
 
 defaultTeams.forEach(t => addTeamRow(t));
 renderVenues(defaultVenues);
+restoreStateOnLoad();
 </script>
 
 </body>

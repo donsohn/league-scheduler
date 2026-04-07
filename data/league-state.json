@@ -1,0 +1,35 @@
+{
+  "schedule": {
+    "leagueName": "Test",
+    "divisions": [
+      {
+        "name": "All Teams",
+        "teams": [
+          "A",
+          "B",
+          "C"
+        ]
+      }
+    ],
+    "weeks": [
+      {
+        "weekNum": 1,
+        "date": "2026-05-05",
+        "type": "regular",
+        "matches": [
+          {
+            "division": "All vs All",
+            "teamA": "A",
+            "teamB": "B",
+            "time": "18:30",
+            "venue": "Venue 1",
+            "court": 1,
+            "date": "2026-05-05"
+          }
+        ],
+        "note": "Rescheduled to 1 court(s)."
+      }
+    ]
+  },
+  "scores": {}
+}
