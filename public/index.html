@@ -660,6 +660,7 @@
   <div id="exportBar">
     <strong>Export:</strong>
     <button class="btn btn-success btn-small" onclick="exportCSV()">&#8681; Download CSV</button>
+    <button class="btn btn-success btn-small" onclick="exportLeagueApps()" style="background:#1a7a4a;">&#8681; Export for LeagueApps</button>
     <button class="btn btn-outline btn-small" onclick="window.print()">&#128438; Print / Save PDF</button>
     <button class="btn btn-danger btn-small" onclick="newLeague()" style="margin-left:auto;">&#10006; New League</button>
   </div>
@@ -1746,6 +1747,120 @@ function exportCSV() {
   const a    = document.createElement('a');
   a.href     = url;
   a.download = (data.leagueName || 'league').replace(/[^a-z0-9]/gi, '_') + '_schedule.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// =============================================================================
+// LeagueApps CSV Export
+// =============================================================================
+
+function exportLeagueApps() {
+  const data = (window._leagueState || {}).schedule;
+  if (!data) return;
+
+  // Exact LeagueApps import template columns
+  const LEAGUEAPPS_COLUMNS = [
+    'SUB_PROGRAM',
+    'HOME_TEAM',
+    'AWAY_TEAM',
+    'DATE',
+    'START_TIME',
+    'END_TIME',
+    'LOCATION',
+    'SUB_LOCATION',
+    'TYPE',
+    'NOTES',
+  ];
+
+  const slotDuration = ((window._leagueState || {}).generateConfig || {}).slotDuration || 35;
+
+  function calcEndTime(startTime, durationMins) {
+    if (!startTime) return '';
+    const [h, m] = startTime.split(':').map(Number);
+    const total = h * 60 + m + durationMins;
+    const eh = Math.floor(total / 60) % 24;
+    const em = total % 60;
+    return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+  }
+
+  function formatLeagueAppsDate(dateStr) {
+    // LeagueApps expects MM/DD/YYYY
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    return `${month}/${day}/${year}`;
+  }
+
+  function formatLeagueAppsTime(timeStr) {
+    // Convert HH:MM (24h) to H:MM AM/PM
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hour = h % 12 || 12;
+    return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+  }
+
+  const rows = [LEAGUEAPPS_COLUMNS];
+
+  (data.weeks || []).forEach(week => {
+    (week.matches || []).forEach(m => {
+      const endTime = calcEndTime(m.time, slotDuration);
+      rows.push([
+        data.leagueName || '',          // SUB_PROGRAM
+        m.teamA || '',                   // HOME_TEAM
+        m.teamB || '',                   // AWAY_TEAM
+        formatLeagueAppsDate(week.date), // DATE
+        formatLeagueAppsTime(m.time),    // START_TIME
+        formatLeagueAppsTime(endTime),   // END_TIME
+        m.venue || '',                   // LOCATION
+        `Court ${m.court}` || '',        // SUB_LOCATION
+        'REGULAR_SEASON',                // TYPE
+        '',                              // NOTES
+      ]);
+    });
+  });
+
+  if (data.playoffs) {
+    [
+      { night: data.playoffs.night1, type: 'PLAYOFF' },
+      { night: data.playoffs.night2, type: 'PLAYOFF' },
+    ].forEach(({ night, type }) => {
+      if (!night) return;
+      (night.matches || []).forEach(m => {
+        const endTime = calcEndTime(m.time, slotDuration);
+        rows.push([
+          data.leagueName || '',
+          m.teamA || '',
+          m.teamB || '',
+          formatLeagueAppsDate(night.date),
+          formatLeagueAppsTime(m.time),
+          formatLeagueAppsTime(endTime),
+          m.venue || '',
+          `Court ${m.court}` || '',
+          type,
+          m.round || '',
+        ]);
+      });
+    });
+  }
+
+  const csv = rows.map(row =>
+    row.map(cell => {
+      const s = String(cell == null ? '' : cell);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }).join(',')
+  ).join('\r\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = (data.leagueName || 'league').replace(/[^a-z0-9]/gi, '_') + '_leagueapps_import.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
