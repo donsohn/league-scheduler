@@ -17,6 +17,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const PDFDocument = require('pdfkit');
 const { Redis } = require('@upstash/redis');
 
 const app = express();
@@ -168,8 +169,19 @@ function seedTeamsFromStandings(standings) {
 
 /**
  * Divide an array of team names into divisions of 3 or 4.
+ * If divisionSizes is provided (e.g. [3,4,3]), use those exact sizes.
  */
-function buildDivisions(teams) {
+function buildDivisions(teams, divisionSizes = null) {
+  if (divisionSizes && Array.isArray(divisionSizes) && divisionSizes.length > 0) {
+    const divisions = [];
+    let offset = 0;
+    for (const size of divisionSizes) {
+      divisions.push(teams.slice(offset, offset + size));
+      offset += size;
+    }
+    return divisions;
+  }
+
   const n = teams.length;
   const base = Math.floor(n / 3);
   const rem = n % 3;
@@ -193,6 +205,32 @@ function buildDivisions(teams) {
   }
 
   return divisions;
+}
+
+/**
+ * Check for simultaneous court conflicts (same team in two matches at the same time).
+ * Returns array of conflict descriptions, or empty array if clean.
+ */
+function checkDoubleBooking(matches) {
+  const conflicts = [];
+  const byTime = {};
+  matches.forEach(m => {
+    const t = m.time;
+    if (!byTime[t]) byTime[t] = [];
+    byTime[t].push(m);
+  });
+  for (const [time, ms] of Object.entries(byTime)) {
+    const seen = {};
+    for (const m of ms) {
+      for (const team of [m.teamA, m.teamB]) {
+        if (seen[team]) {
+          conflicts.push(`${team} is double-booked at ${time} (on ${m.date || 'unknown date'})`);
+        }
+        seen[team] = true;
+      }
+    }
+  }
+  return conflicts;
 }
 
 // ---------------------------------------------------------------------------
@@ -757,6 +795,7 @@ app.post('/api/generate', (req, res) => {
       scheduleFormat = 'Divisional with Relegation',
       teamConflicts = {},
       blackoutDates = [],
+      divisionSizes = null,
     } = req.body;
 
     if (!teams || !Array.isArray(teams) || teams.length < 3) {
@@ -787,12 +826,35 @@ app.post('/api/generate', (req, res) => {
     }
 
     // --- Divisional with Relegation (existing logic) ---
-    const divisions = buildDivisions(teams);
+
+    // Validate custom division sizes if provided
+    if (divisionSizes) {
+      const sizeSum = divisionSizes.reduce((s, n) => s + n, 0);
+      if (sizeSum !== teams.length) {
+        return res.status(400).json({
+          error: `divisionSizes sum (${sizeSum}) must equal number of teams (${teams.length}).`,
+        });
+      }
+      if (divisionSizes.some(s => s < 2)) {
+        return res.status(400).json({ error: 'Each division must have at least 2 teams.' });
+      }
+    }
+
+    const divisions = buildDivisions(teams, divisionSizes);
 
     const weeks = [];
     for (let w = 1; w <= numWeeks; w++) {
       const date = gameNightDates[w - 1];
       const matches = buildWeekSchedule(divisions, w, date, venues, startTime, slotDuration);
+
+      // Validate no team is double-booked
+      const conflicts = checkDoubleBooking(matches);
+      if (conflicts.length > 0) {
+        return res.status(400).json({
+          error: `Schedule conflict detected in week ${w}: ${conflicts.join('; ')}`,
+        });
+      }
+
       weeks.push({
         weekNum: w,
         date,
@@ -958,26 +1020,54 @@ app.post('/api/finalize-week', async (req, res) => {
     const promotions = [];
     const relegations = [];
 
+    // Determine which divisions are inactive this week
+    const inactiveDivisions = (state.inactiveDivisions || {})[`week_${weekNum}`] || [];
+    const promotionRules = state.promotionRules || {};
+
     for (let i = 0; i < divisions.length - 1; i++) {
       const higherDiv = divisions[i];
       const lowerDiv  = divisions[i + 1];
+
+      // Skip boundary if either adjacent division is inactive this week
+      const higherInactive = inactiveDivisions.includes(higherDiv.name);
+      const lowerInactive  = inactiveDivisions.includes(lowerDiv.name);
+      if (higherInactive || lowerInactive) continue;
 
       const higherRows = standings[higherDiv.name] || [];
       const lowerRows  = standings[lowerDiv.name]  || [];
       if (higherRows.length === 0 || lowerRows.length === 0) continue;
 
-      const relegatedTeam = higherRows[higherRows.length - 1].team;
-      const promotedTeam  = lowerRows[0].team;
+      // Determine how many teams to move at this boundary
+      const ruleKey = `${higherDiv.name}|${lowerDiv.name}`;
+      const rule = promotionRules[ruleKey] || { teamsPerMove: 1, triggerEvery: 1, gamesPlayedCount: 0 };
+      rule.gamesPlayedCount = (rule.gamesPlayedCount || 0) + 1;
 
-      const hiIdx = higherDiv.teams.indexOf(relegatedTeam);
-      const loIdx = lowerDiv.teams.indexOf(promotedTeam);
+      const shouldTrigger = rule.gamesPlayedCount % rule.triggerEvery === 0;
+      const numToMove = shouldTrigger ? rule.teamsPerMove : 1;
 
-      if (hiIdx !== -1 && loIdx !== -1) {
-        higherDiv.teams[hiIdx] = promotedTeam;
-        lowerDiv.teams[loIdx]  = relegatedTeam;
-        promotions.push({ promoted: promotedTeam, from: lowerDiv.name,  to: higherDiv.name });
-        relegations.push({ relegated: relegatedTeam, from: higherDiv.name, to: lowerDiv.name });
+      // Update the stored rule
+      promotionRules[ruleKey] = rule;
+
+      const maxMove = Math.min(numToMove, Math.floor(higherRows.length / 2), Math.floor(lowerRows.length / 2));
+      for (let m = 0; m < maxMove; m++) {
+        const relegatedTeam = higherRows[higherRows.length - 1 - m].team;
+        const promotedTeam  = lowerRows[m].team;
+
+        const hiIdx = higherDiv.teams.indexOf(relegatedTeam);
+        const loIdx = lowerDiv.teams.indexOf(promotedTeam);
+
+        if (hiIdx !== -1 && loIdx !== -1) {
+          higherDiv.teams[hiIdx] = promotedTeam;
+          lowerDiv.teams[loIdx]  = relegatedTeam;
+          promotions.push({ promoted: promotedTeam, from: lowerDiv.name,  to: higherDiv.name });
+          relegations.push({ relegated: relegatedTeam, from: higherDiv.name, to: lowerDiv.name });
+        }
       }
+    }
+
+    // Persist updated promotion rules
+    if (Object.keys(promotionRules).length > 0) {
+      state.promotionRules = promotionRules;
     }
 
     const cfg          = state.generateConfig || {};
@@ -1161,6 +1251,297 @@ app.patch('/api/edit-match', async (req, res) => {
 
   } catch (err) {
     console.error('Error editing match:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// API: LeagueApps CSV Export
+// ---------------------------------------------------------------------------
+
+function formatLeagueAppsDate(dateStr) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${month}/${day}/${year}`;
+}
+
+function formatLeagueAppsTime(timeStr) {
+  if (!timeStr) return '';
+  const [h, m] = timeStr.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+function buildLeagueAppsCSV(state) {
+  const schedule = state.schedule;
+  const slotDuration = (state.generateConfig || {}).slotDuration || 35;
+
+  const COLUMNS = ['SUB_PROGRAM','HOME_TEAM','AWAY_TEAM','DATE','START_TIME','END_TIME','LOCATION','SUB_LOCATION','TYPE','NOTES'];
+  const rows = [COLUMNS];
+
+  function addMatchRow(m, date, type, notes = '') {
+    const endMinutes = parseTime(m.time || '00:00') + slotDuration;
+    const endTime = formatTime(endMinutes);
+    rows.push([
+      schedule.leagueName || '',
+      m.teamA || '',
+      m.teamB || '',
+      formatLeagueAppsDate(date),
+      formatLeagueAppsTime(m.time),
+      formatLeagueAppsTime(endTime),
+      m.venue || '',
+      `Court ${m.court || ''}`,
+      type,
+      notes,
+    ]);
+  }
+
+  (schedule.weeks || []).forEach(week => {
+    (week.matches || []).forEach(m => addMatchRow(m, week.date, 'REGULAR_SEASON'));
+  });
+
+  if (schedule.playoffs) {
+    [schedule.playoffs.night1, schedule.playoffs.night2].forEach(night => {
+      if (!night) return;
+      (night.matches || []).forEach(m => addMatchRow(m, night.date, 'PLAYOFF', m.round || ''));
+    });
+  }
+
+  return rows.map(row =>
+    row.map(cell => {
+      const s = String(cell == null ? '' : cell);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }).join(',')
+  ).join('\r\n');
+}
+
+app.get('/api/export/csv', async (req, res) => {
+  try {
+    const state = await loadStateFromFile();
+    if (!state || !state.schedule) {
+      return res.status(400).json({ error: 'No league state found.' });
+    }
+    const csv = buildLeagueAppsCSV(state);
+    const filename = (state.schedule.leagueName || 'league').replace(/[^a-z0-9]/gi, '_') + '_leagueapps_import.csv';
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    console.error('CSV export error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// API: PDF Game Sheet Export
+// ---------------------------------------------------------------------------
+
+function buildPDF(doc, title, dateStr, venueNames, matches, slotDuration) {
+  const PAGE_W = doc.page.width;
+  const MARGIN = 48;
+  const CONTENT_W = PAGE_W - MARGIN * 2;
+
+  // Header
+  doc.fontSize(18).font('Helvetica-Bold').text(title, MARGIN, MARGIN, { width: CONTENT_W, align: 'center' });
+  doc.fontSize(13).font('Helvetica').text(dateStr, MARGIN, MARGIN + 26, { width: CONTENT_W, align: 'center' });
+  if (venueNames && venueNames.length) {
+    doc.fontSize(11).text(venueNames.join(', '), MARGIN, MARGIN + 44, { width: CONTENT_W, align: 'center' });
+  }
+
+  doc.moveTo(MARGIN, MARGIN + 62).lineTo(PAGE_W - MARGIN, MARGIN + 62).stroke();
+
+  // Table header
+  const TABLE_TOP = MARGIN + 74;
+  const COL_TIME   = MARGIN;
+  const COL_COURT  = COL_TIME  + 60;
+  const COL_TEAMA  = COL_COURT + 50;
+  const COL_VS     = COL_TEAMA + 155;
+  const COL_TEAMB  = COL_VS    + 28;
+  const COL_SCORE  = COL_TEAMB + 155;
+
+  const ROW_H = 22;
+
+  doc.fontSize(10).font('Helvetica-Bold');
+  doc.text('Time',   COL_TIME,  TABLE_TOP, { width: 55 });
+  doc.text('Court',  COL_COURT, TABLE_TOP, { width: 45 });
+  doc.text('Home Team',   COL_TEAMA, TABLE_TOP, { width: 150 });
+  doc.text('vs',     COL_VS,    TABLE_TOP, { width: 24, align: 'center' });
+  doc.text('Away Team',   COL_TEAMB, TABLE_TOP, { width: 150 });
+  doc.text('Score', COL_SCORE,  TABLE_TOP);
+
+  const headerLineY = TABLE_TOP + ROW_H - 4;
+  doc.moveTo(MARGIN, headerLineY).lineTo(PAGE_W - MARGIN, headerLineY).stroke();
+
+  doc.font('Helvetica').fontSize(9);
+  let y = TABLE_TOP + ROW_H;
+  matches.forEach((m, idx) => {
+    if (y > doc.page.height - 150) {
+      doc.addPage();
+      y = MARGIN;
+    }
+    if (idx % 2 === 1) {
+      doc.rect(MARGIN, y - 2, CONTENT_W, ROW_H).fill('#f5f5f5').stroke('#f5f5f5');
+      doc.fillColor('black');
+    }
+    doc.text(m.time || '', COL_TIME,  y, { width: 55 });
+    doc.text(String(m.court || ''), COL_COURT, y, { width: 45 });
+    doc.text(m.teamA || '', COL_TEAMA, y, { width: 150 });
+    doc.text('vs',     COL_VS,    y, { width: 24, align: 'center' });
+    doc.text(m.teamB || '', COL_TEAMB, y, { width: 150 });
+    // Score blank field
+    const scoreX = COL_SCORE;
+    doc.text('___', scoreX, y, { width: 20 });
+    doc.text(':', scoreX + 22, y, { width: 10, align: 'center' });
+    doc.text('___', scoreX + 32, y, { width: 20 });
+    y += ROW_H;
+  });
+
+  // Footer: Notes / Marketing box
+  const footerTop = Math.max(y + 20, doc.page.height - 160);
+  doc.moveTo(MARGIN, footerTop).lineTo(PAGE_W - MARGIN, footerTop).stroke();
+  doc.fontSize(10).font('Helvetica-Bold').text('Notes / Marketing', MARGIN, footerTop + 6);
+  doc.rect(MARGIN, footerTop + 22, CONTENT_W, 100).stroke();
+}
+
+// GET /api/export/pdf/playoff/:nightNum  — must be defined BEFORE the :weekNum route
+app.get('/api/export/pdf/playoff/:nightNum', async (req, res) => {
+  try {
+    const nightNum = parseInt(req.params.nightNum, 10);
+    if (nightNum !== 1 && nightNum !== 2) {
+      return res.status(400).json({ error: 'nightNum must be 1 or 2.' });
+    }
+    const state = await loadStateFromFile();
+    if (!state || !state.schedule) {
+      return res.status(400).json({ error: 'No league state found.' });
+    }
+    const playoffs = state.schedule.playoffs;
+    if (!playoffs) {
+      return res.status(400).json({ error: 'No playoffs in schedule.' });
+    }
+    const night = nightNum === 1 ? playoffs.night1 : playoffs.night2;
+    if (!night) {
+      return res.status(400).json({ error: `Playoff night ${nightNum} not found.` });
+    }
+    const cfg = state.generateConfig || {};
+    const slotDuration = cfg.slotDuration || 35;
+    const leagueName = (state.schedule.leagueName || 'League');
+    const venues = [...new Set((night.matches || []).map(m => m.venue).filter(Boolean))];
+    const doc = new PDFDocument({ size: 'LETTER', margin: 0 });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="playoff_night${nightNum}_gamesheet.pdf"`);
+    doc.pipe(res);
+    buildPDF(doc, `${leagueName} — Playoff Night ${nightNum}`, night.date || '', venues, night.matches || [], slotDuration);
+    doc.end();
+  } catch (err) {
+    console.error('PDF playoff export error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/export/pdf/:weekNum
+app.get('/api/export/pdf/:weekNum', async (req, res) => {
+  try {
+    const weekNum = parseInt(req.params.weekNum, 10);
+    if (isNaN(weekNum)) {
+      return res.status(400).json({ error: 'Invalid weekNum.' });
+    }
+    const state = await loadStateFromFile();
+    if (!state || !state.schedule) {
+      return res.status(400).json({ error: 'No league state found.' });
+    }
+    const week = (state.schedule.weeks || []).find(w => w.weekNum === weekNum);
+    if (!week) {
+      return res.status(400).json({ error: `Week ${weekNum} not found.` });
+    }
+    const cfg = state.generateConfig || {};
+    const slotDuration = cfg.slotDuration || 35;
+    const leagueName = (state.schedule.leagueName || 'League');
+    const venues = [...new Set((week.matches || []).map(m => m.venue).filter(Boolean))];
+    const doc = new PDFDocument({ size: 'LETTER', margin: 0 });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="week${weekNum}_gamesheet.pdf"`);
+    doc.pipe(res);
+    buildPDF(doc, `${leagueName} — Week ${weekNum}`, week.date || '', venues, week.matches || [], slotDuration);
+    doc.end();
+  } catch (err) {
+    console.error('PDF export error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// API: Division Toggle
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /api/toggle-division
+ * Body: { weekNum, divisionName, active: true|false }
+ */
+app.post('/api/toggle-division', async (req, res) => {
+  try {
+    const { weekNum, divisionName, active } = req.body;
+    if (!weekNum || !divisionName || active === undefined) {
+      return res.status(400).json({ error: 'weekNum, divisionName, and active are required.' });
+    }
+    let state = await loadStateFromFile();
+    if (!state || !state.schedule) {
+      return res.status(400).json({ error: 'No league state found.' });
+    }
+    if (!state.inactiveDivisions) state.inactiveDivisions = {};
+    const key = `week_${weekNum}`;
+    if (!state.inactiveDivisions[key]) state.inactiveDivisions[key] = [];
+
+    if (active) {
+      // Remove from inactive list
+      state.inactiveDivisions[key] = state.inactiveDivisions[key].filter(d => d !== divisionName);
+    } else {
+      // Add to inactive list (avoid duplicates)
+      if (!state.inactiveDivisions[key].includes(divisionName)) {
+        state.inactiveDivisions[key].push(divisionName);
+      }
+    }
+
+    await persistState(state);
+    res.json({ ok: true, inactiveDivisions: state.inactiveDivisions });
+  } catch (err) {
+    console.error('Toggle division error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// API: Set Promotion Rule
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /api/set-promotion-rule
+ * Body: { higherDivision, lowerDivision, teamsPerMove, triggerEvery }
+ */
+app.post('/api/set-promotion-rule', async (req, res) => {
+  try {
+    const { higherDivision, lowerDivision, teamsPerMove = 1, triggerEvery = 1 } = req.body;
+    if (!higherDivision || !lowerDivision) {
+      return res.status(400).json({ error: 'higherDivision and lowerDivision are required.' });
+    }
+    let state = await loadStateFromFile();
+    if (!state || !state.schedule) {
+      return res.status(400).json({ error: 'No league state found.' });
+    }
+    if (!state.promotionRules) state.promotionRules = {};
+    const ruleKey = `${higherDivision}|${lowerDivision}`;
+    state.promotionRules[ruleKey] = {
+      teamsPerMove: Math.max(1, parseInt(teamsPerMove, 10) || 1),
+      triggerEvery: Math.max(1, parseInt(triggerEvery, 10) || 1),
+      gamesPlayedCount: (state.promotionRules[ruleKey] || {}).gamesPlayedCount || 0,
+    };
+    await persistState(state);
+    res.json({ ok: true, promotionRules: state.promotionRules });
+  } catch (err) {
+    console.error('Set promotion rule error:', err);
     res.status(500).json({ error: err.message });
   }
 });

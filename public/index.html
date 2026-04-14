@@ -660,7 +660,8 @@
   <div id="exportBar">
     <strong>Export:</strong>
     <button class="btn btn-success btn-small" onclick="exportCSV()">&#8681; Download CSV</button>
-    <button class="btn btn-success btn-small" onclick="exportLeagueApps()" style="background:#1a7a4a;">&#8681; Export for LeagueApps</button>
+    <button class="btn btn-success btn-small" onclick="exportLeagueApps()" style="background:#1a7a4a;">&#8681; Export for LeagueApps (client)</button>
+    <button class="btn btn-success btn-small" onclick="downloadLeagueAppsCSV()" style="background:#0d6b3a;">&#8681; Download LeagueApps CSV</button>
     <button class="btn btn-outline btn-small" onclick="window.print()">&#128438; Print / Save PDF</button>
     <button class="btn btn-danger btn-small" onclick="newLeague()" style="margin-left:auto;">&#10006; New League</button>
   </div>
@@ -754,6 +755,13 @@
             <small class="hint">Game nights falling on these dates will be moved to the following week.</small>
           </div>
 
+          <!-- Division Sizes (Divisional mode only) -->
+          <div class="form-group span2 playoff-fields" id="divisionSizesField">
+            <label for="divisionSizes">Custom Division Sizes (optional)</label>
+            <input type="text" id="divisionSizes" placeholder="e.g. 3,4,3  (leave blank for auto)" />
+            <small class="hint">Comma-separated team counts per division. Must sum to total teams. Leave blank for auto-distribution.</small>
+          </div>
+
           <!-- Team Conflicts -->
           <div class="form-group span2">
             <label for="teamConflicts">Team Time Conflicts (JSON)</label>
@@ -770,6 +778,20 @@
       </form>
     </div><!-- /#configBody -->
   </div><!-- /#configCard -->
+
+  <!-- Promotion Rules Panel (shown after generation for Divisional mode) -->
+  <div id="promotionRulesCard" class="card" style="display:none;">
+    <div class="card-header" id="promotionRulesToggle">
+      &#9881; Promotion / Relegation Rules
+      <span class="toggle-icon">&#9660;</span>
+    </div>
+    <div class="card-body" id="promotionRulesBody">
+      <p style="font-size:13px;margin-bottom:12px;color:#555;">
+        Configure how many teams swap between divisions after each game night.
+      </p>
+      <div id="promotionRulesList"></div>
+    </div>
+  </div>
 
   <!-- Results Container -->
   <div id="resultsContainer"></div>
@@ -869,6 +891,7 @@ document.getElementById('scheduleFormat').addEventListener('change', function() 
   const isAva = this.value === 'All-vs-All Round Robin';
   document.getElementById('playoffField1').classList.toggle('hidden-soft', isAva);
   document.getElementById('playoffField2').classList.toggle('hidden-soft', isAva);
+  document.getElementById('divisionSizesField').classList.toggle('hidden-soft', isAva);
 });
 
 // =============================================================================
@@ -1034,6 +1057,14 @@ async function generateSchedule() {
 
   const scheduleFormat = document.getElementById('scheduleFormat').value;
 
+  // Parse custom division sizes
+  let divisionSizes = null;
+  const divSizeRaw = document.getElementById('divisionSizes').value.trim();
+  if (divSizeRaw && scheduleFormat !== 'All-vs-All Round Robin') {
+    divisionSizes = divSizeRaw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+    if (divisionSizes.length === 0) divisionSizes = null;
+  }
+
   const payload = {
     teams:           rawTeams,
     leagueName:      document.getElementById('leagueName').value.trim() || 'Volleyball League',
@@ -1047,6 +1078,7 @@ async function generateSchedule() {
     scheduleFormat,
     teamConflicts,
     blackoutDates,
+    divisionSizes,
   };
 
   try {
@@ -1308,9 +1340,10 @@ function renderResults(data, scores) {
   container.innerHTML = '';
   document.getElementById('standingsContainer').innerHTML = '';
 
+  const isAva = data.scheduleFormat === 'All-vs-All Round Robin';
+
   // Divisions summary
   if (data.divisions && data.divisions.length) {
-    const isAva = data.scheduleFormat === 'All-vs-All Round Robin';
     const title = isAva ? 'All Teams (All-vs-All Round Robin)' : 'Division Assignments';
     const divCard = createCard(title);
     const grid = document.createElement('div');
@@ -1325,6 +1358,20 @@ function renderResults(data, scores) {
     });
     divCard.body.appendChild(grid);
     container.appendChild(divCard.card);
+  }
+
+  // Promotion rules panel (divisional mode only)
+  const promoCard = document.getElementById('promotionRulesCard');
+  if (!isAva && data.divisions && data.divisions.length > 1) {
+    promoCard.style.display = '';
+    document.getElementById('promotionRulesToggle').onclick = () => {
+      const body = document.getElementById('promotionRulesBody');
+      body.classList.toggle('hidden');
+      document.getElementById('promotionRulesToggle').classList.toggle('collapsed');
+    };
+    renderPromotionRules(data.divisions);
+  } else {
+    promoCard.style.display = 'none';
   }
 
   // Regular season weeks
@@ -1347,6 +1394,35 @@ function renderResults(data, scores) {
   }
 }
 
+function renderPromotionRules(divisions) {
+  const list = document.getElementById('promotionRulesList');
+  list.innerHTML = '';
+  const rules = (window._leagueState || {}).promotionRules || {};
+  for (let i = 0; i < divisions.length - 1; i++) {
+    const hi = divisions[i].name;
+    const lo = divisions[i + 1].name;
+    const ruleKey = `${hi}|${lo}`;
+    const rule = rules[ruleKey] || { teamsPerMove: 1, triggerEvery: 1 };
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;';
+    row.innerHTML = `
+      <span style="font-size:13px;min-width:200px;"><strong>${esc(hi)}</strong> &harr; <strong>${esc(lo)}</strong></span>
+      <label style="font-size:12px;">Teams per move:
+        <input type="number" min="1" max="5" value="${rule.teamsPerMove}"
+          id="promo-tpm-${i}" style="width:50px;padding:3px 6px;margin-left:4px;" />
+      </label>
+      <label style="font-size:12px;">Trigger every N nights:
+        <input type="number" min="1" max="20" value="${rule.triggerEvery}"
+          id="promo-te-${i}" style="width:50px;padding:3px 6px;margin-left:4px;" />
+      </label>
+      <button class="btn btn-secondary btn-small"
+        onclick="savePromotionRule('${esc(hi)}','${esc(lo)}',${i})">Save Rule</button>
+      <span id="promo-feedback-${i}" style="font-size:12px;color:#27ae60;display:none;">&#10003; Saved</span>
+    `;
+    list.appendChild(row);
+  }
+}
+
 function renderPlayoffCard(playoffs, container) {
   let pfCard = document.getElementById('playoffCard');
   if (pfCard) pfCard.remove();
@@ -1354,10 +1430,10 @@ function renderPlayoffCard(playoffs, container) {
   const card = createCard('Playoffs');
   card.card.id = 'playoffCard';
   if (playoffs.night1) {
-    card.body.appendChild(buildNightSection(playoffs.night1, 'Playoff Night 1'));
+    card.body.appendChild(buildNightSection(playoffs.night1, 'Playoff Night 1', 1));
   }
   if (playoffs.night2) {
-    card.body.appendChild(buildNightSection(playoffs.night2, 'Playoff Night 2'));
+    card.body.appendChild(buildNightSection(playoffs.night2, 'Playoff Night 2', 2));
   }
   (container || document.getElementById('resultsContainer')).appendChild(card.card);
 }
@@ -1370,8 +1446,8 @@ function refreshPlayoffSection(playoffs) {
   }
   const newCard = createCard('Playoffs');
   newCard.card.id = 'playoffCard';
-  if (playoffs.night1) newCard.body.appendChild(buildNightSection(playoffs.night1, 'Playoff Night 1'));
-  if (playoffs.night2) newCard.body.appendChild(buildNightSection(playoffs.night2, 'Playoff Night 2'));
+  if (playoffs.night1) newCard.body.appendChild(buildNightSection(playoffs.night1, 'Playoff Night 1', 1));
+  if (playoffs.night2) newCard.body.appendChild(buildNightSection(playoffs.night2, 'Playoff Night 2', 2));
   existing.replaceWith(newCard.card);
 }
 
@@ -1424,6 +1500,30 @@ function buildWeekSection(week) {
 
   body.appendChild(buildMatchTable(week.matches, { weekNum: week.weekNum }));
 
+  // Division toggle controls (Divisional mode only)
+  if (scheduleFormat !== 'All-vs-All Round Robin') {
+    const divs = (((window._leagueState || {}).schedule || {}).divisions || []);
+    if (divs.length > 1) {
+      const toggleBar = document.createElement('div');
+      toggleBar.className = 'week-save-bar';
+      toggleBar.style.background = '#f0f4ff';
+      toggleBar.innerHTML = '<span style="font-size:12px;font-weight:600;color:#444;margin-right:8px;">Active Divisions:</span>';
+      const inactiveList = (((window._leagueState || {}).inactiveDivisions || {})[`week_${week.weekNum}`] || []);
+      divs.forEach(div => {
+        const isActive = !inactiveList.includes(div.name);
+        const lbl = document.createElement('label');
+        lbl.style.cssText = 'font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;margin-right:10px;';
+        lbl.innerHTML = `
+          <input type="checkbox" ${isActive ? 'checked' : ''}
+            onchange="toggleDivision(${week.weekNum},'${esc(div.name)}',this.checked)" />
+          ${esc(div.name)}
+        `;
+        toggleBar.appendChild(lbl);
+      });
+      body.appendChild(toggleBar);
+    }
+  }
+
   // Save scores bar
   const saveBar = document.createElement('div');
   saveBar.className = 'week-save-bar';
@@ -1431,6 +1531,9 @@ function buildWeekSection(week) {
     <button class="btn btn-success btn-small" id="save-btn-${week.weekNum}"
       onclick="saveWeekScores(${week.weekNum})">&#128190; Save Scores for Week ${week.weekNum}</button>
     <span class="week-save-feedback" id="save-feedback-${week.weekNum}"></span>
+    <button class="btn btn-secondary btn-small" onclick="window.open('/api/export/pdf/${week.weekNum}','_blank')" title="Download printable game sheet PDF">
+      &#128438; Print Game Sheet
+    </button>
     <button class="btn btn-warning btn-small" onclick="openRescheduleModal(${week.weekNum})" style="margin-left:auto;">
       &#9881; Reschedule Night
     </button>
@@ -1472,7 +1575,7 @@ function buildWeekSection(week) {
   return wrapper;
 }
 
-function buildNightSection(night, title) {
+function buildNightSection(night, title, nightNum) {
   const wrapper = document.createElement('div');
   wrapper.className = 'week-card';
 
@@ -1487,6 +1590,18 @@ function buildNightSection(night, title) {
   const body = document.createElement('div');
   body.className = 'week-body';
   body.appendChild(buildMatchTable(night.matches, { isPlayoff: true }));
+
+  if (nightNum) {
+    const pdfBar = document.createElement('div');
+    pdfBar.className = 'week-save-bar';
+    pdfBar.innerHTML = `
+      <button class="btn btn-secondary btn-small"
+        onclick="window.open('/api/export/pdf/playoff/${nightNum}','_blank')" title="Download printable game sheet PDF">
+        &#128438; Print Game Sheet (Playoff Night ${nightNum})
+      </button>
+    `;
+    body.appendChild(pdfBar);
+  }
 
   header.addEventListener('click', () => {
     body.classList.toggle('hidden');
@@ -1620,15 +1735,18 @@ function resetForm() {
   document.getElementById('exportBar').classList.remove('visible');
   document.getElementById('statusBanner').style.display = 'none';
   document.getElementById('leagueTitle').textContent = 'Volleyball League Scheduler';
+  document.getElementById('promotionRulesCard').style.display = 'none';
 
   document.getElementById('teamsList').innerHTML = '';
   defaultTeams.forEach(t => addTeamRow(t));
   renderVenues(defaultVenues);
   document.getElementById('teamConflicts').value = '';
   document.getElementById('blackoutDates').value = '';
+  document.getElementById('divisionSizes').value = '';
   document.getElementById('scheduleFormat').value = 'Divisional with Relegation';
   document.getElementById('playoffField1').classList.remove('hidden-soft');
   document.getElementById('playoffField2').classList.remove('hidden-soft');
+  document.getElementById('divisionSizesField').classList.remove('hidden-soft');
 
   document.getElementById('configBody').classList.remove('hidden');
   document.getElementById('configToggle').classList.remove('collapsed');
@@ -1671,6 +1789,10 @@ async function restoreStateOnLoad() {
     }
     if (cfg.blackoutDates && cfg.blackoutDates.length > 0) {
       document.getElementById('blackoutDates').value = cfg.blackoutDates.join(', ');
+    }
+
+    if (cfg.divisionSizes && Array.isArray(cfg.divisionSizes) && cfg.divisionSizes.length) {
+      document.getElementById('divisionSizes').value = cfg.divisionSizes.join(', ');
     }
 
     renderResults(state.schedule, state.scores || {});
@@ -2128,6 +2250,69 @@ async function submitReschedule() {
       closeRescheduleModal();
     }
 
+  } catch (err) {
+    showStatus('Network error: ' + err.message, 'error');
+  }
+}
+
+// =============================================================================
+// Server-side LeagueApps CSV Download
+// =============================================================================
+
+function downloadLeagueAppsCSV() {
+  window.location.href = '/api/export/csv';
+}
+
+// =============================================================================
+// Division Toggle
+// =============================================================================
+
+async function toggleDivision(weekNum, divisionName, active) {
+  try {
+    const res = await fetch('/api/toggle-division', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weekNum, divisionName, active }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showStatus('Toggle error: ' + (data.error || 'Unknown'), 'error');
+      return;
+    }
+    if (window._leagueState) {
+      window._leagueState.inactiveDivisions = data.inactiveDivisions;
+    }
+  } catch (err) {
+    showStatus('Network error: ' + err.message, 'error');
+  }
+}
+
+// =============================================================================
+// Promotion Rules
+// =============================================================================
+
+async function savePromotionRule(higherDivision, lowerDivision, idx) {
+  const tpm = parseInt(document.getElementById(`promo-tpm-${idx}`).value, 10) || 1;
+  const te  = parseInt(document.getElementById(`promo-te-${idx}`).value, 10)  || 1;
+  try {
+    const res = await fetch('/api/set-promotion-rule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ higherDivision, lowerDivision, teamsPerMove: tpm, triggerEvery: te }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showStatus('Error saving rule: ' + (data.error || 'Unknown'), 'error');
+      return;
+    }
+    if (window._leagueState) {
+      window._leagueState.promotionRules = data.promotionRules;
+    }
+    const fb = document.getElementById(`promo-feedback-${idx}`);
+    if (fb) {
+      fb.style.display = 'inline';
+      setTimeout(() => { fb.style.display = 'none'; }, 2500);
+    }
   } catch (err) {
     showStatus('Network error: ' + err.message, 'error');
   }
