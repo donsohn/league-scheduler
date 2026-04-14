@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Volleyball League Scheduler</title>
+  <title>League Scheduler #1</title>
   <style>
     /* -----------------------------------------------------------------------
        Base / Reset
@@ -643,7 +643,7 @@
 <header>
   <div class="logo">&#127952;</div>
   <div>
-    <h1 id="leagueTitle">Volleyball League Scheduler</h1>
+    <h1 id="leagueTitle">League Scheduler #1</h1>
     <p>Configure your league below and generate a complete season schedule.</p>
   </div>
 </header>
@@ -1112,7 +1112,7 @@ async function generateSchedule() {
 
     renderResults(data, {});
     renderStandings(standings);
-    document.getElementById('leagueTitle').textContent = data.leagueName || 'Volleyball League Scheduler';
+    document.getElementById('leagueTitle').textContent = data.leagueName || 'League Scheduler #1';
     showStatus(`Schedule generated: ${data.weeks.length} regular season week(s)` +
       (data.playoffs ? ' + playoffs.' : '.'), 'success');
     document.getElementById('exportBar').classList.add('visible');
@@ -1734,7 +1734,7 @@ function resetForm() {
   document.getElementById('standingsContainer').innerHTML = '';
   document.getElementById('exportBar').classList.remove('visible');
   document.getElementById('statusBanner').style.display = 'none';
-  document.getElementById('leagueTitle').textContent = 'Volleyball League Scheduler';
+  document.getElementById('leagueTitle').textContent = 'League Scheduler #1';
   document.getElementById('promotionRulesCard').style.display = 'none';
 
   document.getElementById('teamsList').innerHTML = '';
@@ -1797,7 +1797,7 @@ async function restoreStateOnLoad() {
 
     renderResults(state.schedule, state.scores || {});
     document.getElementById('leagueTitle').textContent =
-      state.schedule.leagueName || 'Volleyball League Scheduler';
+      state.schedule.leagueName || 'League Scheduler #1';
     document.getElementById('exportBar').classList.add('visible');
 
     document.getElementById('configBody').classList.add('hidden');
