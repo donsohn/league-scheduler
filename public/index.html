@@ -398,6 +398,9 @@
     .badge-5th   { background: #f3e5f5; color: #4a148c; }
     .badge-early { background: #e3f2fd; color: #0d47a1; font-size: 10px; }
     .badge-late  { background: #fce4ec; color: #880e4f; font-size: 10px; }
+    .badge-extra { background: #ffe0b2; color: #bf360c; }
+    table.schedule-table tbody tr.extra-match-row { background: #fff8e6 !important; }
+    table.schedule-table tbody tr.extra-match-row:hover { background: #ffefd4 !important; }
 
     /* Playoff night headers */
     .playoff-night-header {
@@ -694,6 +697,15 @@
             <small class="hint">All-vs-All: every team plays every other team. Each game night, each team plays 2 back-to-back matches.</small>
           </div>
 
+          <!-- Extra Matches toggle (All-vs-All only) -->
+          <div class="form-group span2" id="extraMatchesField" style="display:none;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:600;font-size:13px;">
+              <input type="checkbox" id="allowExtraMatches" style="width:16px;height:16px;cursor:pointer;" />
+              Schedule extra matches when court time is available
+            </label>
+            <small class="hint">After filling 2 back-to-back slots per court, remaining slot time is filled with bonus matches from teams that haven't played each other yet.</small>
+          </div>
+
           <!-- Teams -->
           <div class="form-group span2">
             <label>Teams (3–30 teams)</label>
@@ -894,6 +906,7 @@ document.getElementById('scheduleFormat').addEventListener('change', function() 
   document.getElementById('playoffField1').classList.toggle('hidden-soft', isAva);
   document.getElementById('playoffField2').classList.toggle('hidden-soft', isAva);
   document.getElementById('divisionSizesField').classList.toggle('hidden-soft', isAva);
+  document.getElementById('extraMatchesField').style.display = isAva ? '' : 'none';
 });
 
 // =============================================================================
@@ -1068,19 +1081,20 @@ async function generateSchedule() {
   }
 
   const payload = {
-    teams:           rawTeams,
-    leagueName:      document.getElementById('leagueName').value.trim() || 'Volleyball League',
-    seasonStartDate: document.getElementById('seasonStart').value,
-    numWeeks:        parseInt(document.getElementById('numWeeks').value, 10) || 4,
-    playoffDate1:    scheduleFormat === 'All-vs-All Round Robin' ? null : (document.getElementById('playoffDate1').value || null),
-    playoffDate2:    scheduleFormat === 'All-vs-All Round Robin' ? null : (document.getElementById('playoffDate2').value || null),
+    teams:             rawTeams,
+    leagueName:        document.getElementById('leagueName').value.trim() || 'Volleyball League',
+    seasonStartDate:   document.getElementById('seasonStart').value,
+    numWeeks:          parseInt(document.getElementById('numWeeks').value, 10) || 4,
+    playoffDate1:      scheduleFormat === 'All-vs-All Round Robin' ? null : (document.getElementById('playoffDate1').value || null),
+    playoffDate2:      scheduleFormat === 'All-vs-All Round Robin' ? null : (document.getElementById('playoffDate2').value || null),
     venues,
-    startTime:       document.getElementById('startTime').value || '18:30',
-    slotDuration:    parseInt(document.getElementById('slotDuration').value, 10) || 35,
+    startTime:         document.getElementById('startTime').value || '18:30',
+    slotDuration:      parseInt(document.getElementById('slotDuration').value, 10) || 35,
     scheduleFormat,
     teamConflicts,
     blackoutDates,
     divisionSizes,
+    allowExtraMatches: scheduleFormat === 'All-vs-All Round Robin' && document.getElementById('allowExtraMatches').checked,
   };
 
   try {
@@ -1284,6 +1298,10 @@ function renderStandings(standings) {
     return na - nb;
   });
 
+  const isAva = ((window._leagueState || {}).schedule || {}).scheduleFormat === 'All-vs-All Round Robin';
+  const extraMatchCounts = isAva ? (((window._leagueState || {}).schedule || {}).extraMatchCounts || {}) : {};
+  const hasExtraMatches = isAva && Object.values(extraMatchCounts).some(v => v > 0);
+
   divNames.forEach(divName => {
     const rows = standings[divName];
     const block = document.createElement('div');
@@ -1303,6 +1321,7 @@ function renderStandings(standings) {
           <th title="Points For">PF</th>
           <th title="Points Against">PA</th>
           <th title="Points">Pts</th>
+          ${hasExtraMatches ? '<th title="Extra Matches Played" style="color:#bf360c;">XM</th>' : ''}
         </tr>
       </thead>
     `;
@@ -1310,6 +1329,7 @@ function renderStandings(standings) {
     rows.forEach((row, i) => {
       const tr = document.createElement('tr');
       if (i === 0) tr.className = 'standings-gold';
+      const xm = hasExtraMatches ? (extraMatchCounts[row.team] || 0) : null;
       tr.innerHTML = `
         <td>${i + 1}</td>
         <td>${esc(row.team)}</td>
@@ -1319,6 +1339,7 @@ function renderStandings(standings) {
         <td>${row.PF}</td>
         <td>${row.PA}</td>
         <td><strong>${row.Pts}</strong></td>
+        ${hasExtraMatches ? `<td style="color:#bf360c;font-weight:600;">${xm}</td>` : ''}
       `;
       tbody.appendChild(tr);
     });
@@ -1668,6 +1689,7 @@ function buildMatchTable(matches, options = {}) {
       tr.dataset.weekNum = weekNum;
       tr.dataset.matchIdx = matchIndex;
     }
+    if (m.extraMatch) tr.classList.add('extra-match-row');
 
     const divLabel = isPlayoff ? (m.round || '') : (m.division || '');
     const badgeClass = getBadgeClass(divLabel, isPlayoff);
@@ -1718,6 +1740,7 @@ function buildMatchTable(matches, options = {}) {
 }
 
 function getBadgeClass(label, isPlayoff) {
+  if (!isPlayoff && label === 'Extra Match') return 'badge-extra';
   if (!isPlayoff && label === 'All vs All') return 'badge-ava';
   if (isPlayoff) {
     const l = label.toLowerCase();
@@ -1771,6 +1794,8 @@ function resetForm() {
   document.getElementById('playoffField1').classList.remove('hidden-soft');
   document.getElementById('playoffField2').classList.remove('hidden-soft');
   document.getElementById('divisionSizesField').classList.remove('hidden-soft');
+  document.getElementById('allowExtraMatches').checked = false;
+  document.getElementById('extraMatchesField').style.display = 'none';
 
   document.getElementById('configBody').classList.remove('hidden');
   document.getElementById('configToggle').classList.remove('collapsed');
@@ -1806,7 +1831,11 @@ async function restoreStateOnLoad() {
       if (cfg.scheduleFormat === 'All-vs-All Round Robin') {
         document.getElementById('playoffField1').classList.add('hidden-soft');
         document.getElementById('playoffField2').classList.add('hidden-soft');
+        document.getElementById('extraMatchesField').style.display = '';
       }
+    }
+    if (cfg.allowExtraMatches) {
+      document.getElementById('allowExtraMatches').checked = true;
     }
     if (cfg.teamConflicts && Object.keys(cfg.teamConflicts).length > 0) {
       document.getElementById('teamConflicts').value = JSON.stringify(cfg.teamConflicts, null, 2);

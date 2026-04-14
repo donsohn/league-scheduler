@@ -645,18 +645,21 @@ function scoreRound(round, matchCounts) {
  * - Generate 2 disjoint perfect matchings for those teams using the circle method
  * - Assign slot 1 = first matching, slot 2 = second matching (back-to-back)
  * - Teams not selected rest for this night
+ * - If allowExtraMatches is true, fill slot 3 with bonus matches
  *
  * @param {string[]} teams
  * @param {string}   date
  * @param {object[]} venues
  * @param {string}   startTime
  * @param {number}   slotDuration
- * @param {object}   matchCounts  - mutable: { "A|B": count }
- * @param {object}   restCounts   - mutable: { "Team": count }
+ * @param {object}   matchCounts        - mutable: { "A|B": count }
+ * @param {object}   restCounts         - mutable: { "Team": count }
  * @param {object}   teamConflicts
+ * @param {boolean}  allowExtraMatches  - fill spare slot3 court time with bonus matches
+ * @param {object}   extraMatchCounts   - mutable: { "Team": count }
  * @returns {object[]} scheduled matches for this night
  */
-function buildAllVsAllNight(teams, date, venues, startTime, slotDuration, matchCounts, restCounts, teamConflicts) {
+function buildAllVsAllNight(teams, date, venues, startTime, slotDuration, matchCounts, restCounts, teamConflicts, allowExtraMatches, extraMatchCounts) {
   const totalCourts = venues.reduce((s, v) => s + v.courts, 0);
   const N = teams.length;
 
@@ -785,27 +788,93 @@ function buildAllVsAllNight(teams, date, venues, startTime, slotDuration, matchC
     });
   });
 
+  // Extra matches: fill slot 3 court time with bonus matches
+  if (allowExtraMatches && extraMatchCounts) {
+    const slot3Time = formatTime(parseTime(startTime) + 2 * slotDuration);
+
+    // Track pairs and teams that already played tonight
+    const pairsTonight = new Set(
+      matches.map(m => [m.teamA, m.teamB].sort().join('|'))
+    );
+    const extraMatchTonight = new Set();
+
+    for (let courtIdx = 0; courtIdx < totalCourts; courtIdx++) {
+      // Candidates: teams not yet in an extra match tonight
+      const candidates = teams.filter(t => !extraMatchTonight.has(t));
+      if (candidates.length < 2) break;
+
+      let bestPair = null;
+      let bestScore = Infinity;
+
+      for (let i = 0; i < candidates.length; i++) {
+        for (let j = i + 1; j < candidates.length; j++) {
+          const a = candidates[i], b = candidates[j];
+          const pairKey = [a, b].sort().join('|');
+          if (pairsTonight.has(pairKey)) continue; // already played tonight
+
+          // Prioritise teams with fewest extra matches; tiebreak by matchCounts
+          const extraScore = (extraMatchCounts[a] || 0) + (extraMatchCounts[b] || 0);
+          const matchScore = matchCounts[pairKey] || 0;
+          const totalScore = extraScore * 1000 + matchScore;
+
+          if (totalScore < bestScore) {
+            bestScore = totalScore;
+            bestPair = [a, b];
+          }
+        }
+      }
+
+      if (!bestPair) break;
+
+      const [a, b] = bestPair;
+      const pairKey = [a, b].sort().join('|');
+
+      matches.push({
+        division: 'Extra Match',
+        teamA: a,
+        teamB: b,
+        time: slot3Time,
+        venue: courtSlots[courtIdx % courtSlots.length].venue,
+        court: courtSlots[courtIdx % courtSlots.length].court,
+        date,
+        extraMatch: true,
+      });
+
+      extraMatchCounts[a] = (extraMatchCounts[a] || 0) + 1;
+      extraMatchCounts[b] = (extraMatchCounts[b] || 0) + 1;
+      matchCounts[pairKey] = (matchCounts[pairKey] || 0) + 1;
+      extraMatchTonight.add(a);
+      extraMatchTonight.add(b);
+      pairsTonight.add(pairKey);
+    }
+  }
+
   return matches;
 }
 
 /**
  * Build the full All-vs-All season schedule.
+ * @param {boolean} allowExtraMatches - fill spare slot3 court time with bonus matches
  */
-function buildAllVsAllSchedule(teams, numWeeks, gameNightDates, venues, startTime, slotDuration, teamConflicts) {
+function buildAllVsAllSchedule(teams, numWeeks, gameNightDates, venues, startTime, slotDuration, teamConflicts, allowExtraMatches) {
   const matchCounts = {};
   const restCounts = {};
-  teams.forEach(t => { restCounts[t] = 0; });
+  const extraMatchCounts = {};
+  teams.forEach(t => { restCounts[t] = 0; extraMatchCounts[t] = 0; });
 
   const weeks = [];
   for (let w = 1; w <= numWeeks; w++) {
     const date = gameNightDates[w - 1];
     const matches = buildAllVsAllNight(
       teams, date, venues, startTime, slotDuration,
-      matchCounts, restCounts, teamConflicts
+      matchCounts, restCounts, teamConflicts, allowExtraMatches, extraMatchCounts
     );
 
-    // Build rest note
-    const restingTeams = teams.filter(t => !matches.some(m => m.teamA === t || m.teamB === t));
+    // Build rest note (exclude extra-match-only appearances)
+    const regularTeams = new Set(
+      matches.filter(m => !m.extraMatch).flatMap(m => [m.teamA, m.teamB])
+    );
+    const restingTeams = teams.filter(t => !regularTeams.has(t));
     const note = restingTeams.length > 0
       ? `Resting this week: ${restingTeams.join(', ')}`
       : 'All teams active this week';
@@ -819,7 +888,7 @@ function buildAllVsAllSchedule(teams, numWeeks, gameNightDates, venues, startTim
     });
   }
 
-  return { weeks, matchCounts, restCounts };
+  return { weeks, matchCounts, restCounts, extraMatchCounts };
 }
 
 // ---------------------------------------------------------------------------
@@ -849,6 +918,7 @@ app.post('/api/generate', (req, res) => {
       teamConflicts = {},
       blackoutDates = [],
       divisionSizes = null,
+      allowExtraMatches = false,
     } = req.body;
 
     if (!teams || !Array.isArray(teams) || teams.length < 3) {
@@ -863,8 +933,8 @@ app.post('/api/generate', (req, res) => {
 
     if (scheduleFormat === 'All-vs-All Round Robin') {
       // All-vs-All mode: one flat division, no relegation
-      const { weeks, matchCounts, restCounts } = buildAllVsAllSchedule(
-        teams, numWeeks, gameNightDates, venues, startTime, slotDuration, teamConflicts
+      const { weeks, matchCounts, restCounts, extraMatchCounts } = buildAllVsAllSchedule(
+        teams, numWeeks, gameNightDates, venues, startTime, slotDuration, teamConflicts, allowExtraMatches
       );
 
       return res.json({
@@ -875,6 +945,7 @@ app.post('/api/generate', (req, res) => {
         playoffs: null,
         matchCounts,
         restCounts,
+        extraMatchCounts,
       });
     }
 
