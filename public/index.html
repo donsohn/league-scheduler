@@ -396,6 +396,8 @@
     .badge-final { background: #ffcdd2; color: #b71c1c; }
     .badge-3rd   { background: #e0f2f1; color: #004d40; }
     .badge-5th   { background: #f3e5f5; color: #4a148c; }
+    .badge-early { background: #e3f2fd; color: #0d47a1; font-size: 10px; }
+    .badge-late  { background: #fce4ec; color: #880e4f; font-size: 10px; }
 
     /* Playoff night headers */
     .playoff-night-header {
@@ -1498,7 +1500,24 @@ function buildWeekSection(week) {
     body.appendChild(note);
   }
 
-  body.appendChild(buildMatchTable(week.matches, { weekNum: week.weekNum }));
+  // Compute per-venue Early/Late labels for Divisional with Relegation (Feature D4)
+  const venueLabels = {};
+  if (scheduleFormat === 'Divisional with Relegation') {
+    const baseStart = ((window._leagueState || {}).generateConfig || {}).startTime || '18:30';
+    const venueMinTimes = {};
+    week.matches.forEach(m => {
+      if (m.venue && m.time) {
+        if (!venueMinTimes[m.venue] || m.time < venueMinTimes[m.venue]) {
+          venueMinTimes[m.venue] = m.time;
+        }
+      }
+    });
+    Object.keys(venueMinTimes).forEach(v => {
+      venueLabels[v] = venueMinTimes[v] === baseStart ? 'Early' : 'Late';
+    });
+  }
+
+  body.appendChild(buildMatchTable(week.matches, { weekNum: week.weekNum, venueLabels }));
 
   // Division toggle controls (Divisional mode only)
   if (scheduleFormat !== 'All-vs-All Round Robin') {
@@ -1615,10 +1634,11 @@ function buildNightSection(night, title, nightNum) {
 
 /**
  * Build the schedule table from a matches array.
- * options: { isPlayoff, weekNum }
+ * options: { isPlayoff, weekNum, venueLabels }
+ * venueLabels: { "Venue 1": "Early", "Venue 2": "Late" }
  */
 function buildMatchTable(matches, options = {}) {
-  const { isPlayoff = false, weekNum = null } = options;
+  const { isPlayoff = false, weekNum = null, venueLabels = {} } = options;
 
   const table = document.createElement('table');
   table.className = 'schedule-table';
@@ -1652,10 +1672,14 @@ function buildMatchTable(matches, options = {}) {
     const divLabel = isPlayoff ? (m.round || '') : (m.division || '');
     const badgeClass = getBadgeClass(divLabel, isPlayoff);
 
+    const venueLabel = venueLabels[m.venue];
+    const venueCellHtml = esc(m.venue || '') +
+      (venueLabel ? ` <span class="badge badge-${venueLabel.toLowerCase()}">${esc(venueLabel)}</span>` : '');
+
     if (isPlayoff) {
       tr.innerHTML = `
         <td>${esc(m.time || '')}</td>
-        <td>${esc(m.venue || '')}</td>
+        <td>${venueCellHtml}</td>
         <td>${esc(String(m.court || ''))}</td>
         <td><span class="badge ${badgeClass}">${esc(divLabel)}</span></td>
         <td>${esc(m.teamA || '')}</td>
@@ -1665,7 +1689,7 @@ function buildMatchTable(matches, options = {}) {
     } else {
       tr.innerHTML = `
         <td>${esc(m.time || '')}</td>
-        <td>${esc(m.venue || '')}</td>
+        <td>${venueCellHtml}</td>
         <td>${esc(String(m.court || ''))}</td>
         <td><span class="badge ${badgeClass}">${esc(divLabel)}</span></td>
         <td>${esc(m.teamA || '')}</td>

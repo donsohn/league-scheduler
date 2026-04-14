@@ -265,14 +265,35 @@ function formatTime(totalMinutes) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+/**
+ * Compute per-venue start times from venueWeekParity.
+ * Even parity = early (startTime), Odd parity = late (startTime + 3*slotDuration).
+ */
+function computeVenueTimes(venues, venueWeekParity, startTime, slotDuration) {
+  const startMins = parseTime(startTime);
+  const lateOffset = 3 * slotDuration;
+  const venueTimes = {};
+  for (const venue of venues) {
+    const parity = (venueWeekParity || {})[venue.name] != null
+      ? (venueWeekParity || {})[venue.name]
+      : 0;
+    venueTimes[venue.name] = parity % 2 === 0
+      ? formatTime(startMins)
+      : formatTime(startMins + lateOffset);
+  }
+  return venueTimes;
+}
+
 // ---------------------------------------------------------------------------
 // Court Assignment
 // ---------------------------------------------------------------------------
 
 /**
  * Assign time slots, venues, and courts to a list of unscheduled matches.
+ * Optional venueTimes map { "Venue 1": "18:30", "Venue 2": "20:15" } for
+ * per-venue start times (Feature D4: alternating early/late blocks).
  */
-function assignCourts(matches, venues, startTime, slotDuration) {
+function assignCourts(matches, venues, startTime, slotDuration, venueTimes) {
   const courtSlots = [];
   for (const venue of venues) {
     for (let c = 1; c <= venue.courts; c++) {
@@ -287,12 +308,16 @@ function assignCourts(matches, venues, startTime, slotDuration) {
   for (let i = 0; i < matches.length; i++) {
     const slotIndex = Math.floor(i / totalCourts);
     const courtIndex = i % totalCourts;
-    const timeMinutes = startMinutes + slotIndex * slotDuration;
+    const venueName = courtSlots[courtIndex].venue;
+    const venueStart = (venueTimes && venueTimes[venueName] != null)
+      ? parseTime(venueTimes[venueName])
+      : startMinutes;
+    const timeMinutes = venueStart + slotIndex * slotDuration;
 
     scheduled.push({
       ...matches[i],
       time: formatTime(timeMinutes),
-      venue: courtSlots[courtIndex].venue,
+      venue: venueName,
       court: courtSlots[courtIndex].court,
     });
   }
@@ -314,10 +339,38 @@ function div3MatchOrder(teams, weekNum) {
   return orderings[(weekNum - 1) % 3];
 }
 
-function buildWeekSchedule(divisions, weekNum, date, venues, startTime, slotDuration) {
+/**
+ * Build match order for a 3-team division when a team was demoted into it (Feature D2).
+ * A = demoted, B = promoted, C = stayed.
+ * Slot 1: A vs C, Slot 2: B vs C, Slot 3: A vs B
+ */
+function div3DemotionMatchOrder(divName, lastMoves) {
+  const demoted  = lastMoves.find(m => m.division === divName && m.action === 'demoted');
+  const promoted = lastMoves.find(m => m.division === divName && m.action === 'promoted');
+  const stayed   = lastMoves.find(m => m.division === divName && m.action === 'stayed');
+  if (!demoted || !promoted || !stayed) return null;
+  const A = demoted.team, B = promoted.team, C = stayed.team;
+  return [
+    { division: divName, teamA: A, teamB: C },
+    { division: divName, teamA: B, teamB: C },
+    { division: divName, teamA: A, teamB: B },
+  ];
+}
+
+/**
+ * Build one week's full match schedule for all divisions.
+ * lastMoves  – optional array of { team, action, division } from Feature D2
+ * venueTimes – optional map { "Venue 1": "HH:MM", ... } for Feature D4
+ */
+function buildWeekSchedule(divisions, weekNum, date, venues, startTime, slotDuration, lastMoves, venueTimes) {
   const divMatchLists = divisions.map((teams, divIdx) => {
     const divName = `Division ${divIdx + 1}`;
     if (teams.length === 3) {
+      // Feature D2: check if a team was demoted into this division
+      if (lastMoves && lastMoves.length > 0) {
+        const order = div3DemotionMatchOrder(divName, lastMoves);
+        if (order) return order;
+      }
       return div3MatchOrder(teams, weekNum).map(([tA, tB]) => ({
         division: divName,
         teamA: tA,
@@ -350,7 +403,7 @@ function buildWeekSchedule(divisions, weekNum, date, venues, startTime, slotDura
     }
   }
 
-  const scheduled = assignCourts(interleaved, venues, startTime, slotDuration);
+  const scheduled = assignCourts(interleaved, venues, startTime, slotDuration, venueTimes);
   return scheduled.map(m => ({ ...m, date }));
 }
 
@@ -842,10 +895,15 @@ app.post('/api/generate', (req, res) => {
 
     const divisions = buildDivisions(teams, divisionSizes);
 
+    // Feature D4: initialize venue week parity (alternating: venue[0]=early, venue[1]=late, ...)
+    const venueWeekParity = {};
+    venues.forEach((v, i) => { venueWeekParity[v.name] = i % 2; });
+    const initVenueTimes = computeVenueTimes(venues, venueWeekParity, startTime, slotDuration);
+
     const weeks = [];
     for (let w = 1; w <= numWeeks; w++) {
       const date = gameNightDates[w - 1];
-      const matches = buildWeekSchedule(divisions, w, date, venues, startTime, slotDuration);
+      const matches = buildWeekSchedule(divisions, w, date, venues, startTime, slotDuration, null, initVenueTimes);
 
       // Validate no team is double-booked
       const conflicts = checkDoubleBooking(matches);
@@ -881,6 +939,7 @@ app.post('/api/generate', (req, res) => {
       })),
       weeks,
       playoffs,
+      venueWeekParity,
     });
   } catch (err) {
     console.error('Error generating schedule:', err);
@@ -1070,20 +1129,81 @@ app.post('/api/finalize-week', async (req, res) => {
       state.promotionRules = promotionRules;
     }
 
+    // Feature 1: Inactive division internal standings reorder (sandwiched rule)
+    for (let i = 0; i < divisions.length; i++) {
+      const divObj = divisions[i];
+      if (!inactiveDivisions.includes(divObj.name)) continue;
+
+      const aboveActive = i > 0 && !inactiveDivisions.includes(divisions[i - 1].name);
+      const belowActive = i < divisions.length - 1 && !inactiveDivisions.includes(divisions[i + 1].name);
+
+      // Only reorder if at least one adjacent division played
+      if (!aboveActive && !belowActive) continue;
+
+      // Reorder teams by standings (Pts desc → W desc → PF-PA desc)
+      const divStandings = standings[divObj.name] || [];
+      const sortedTeams = divStandings.map(s => s.team);
+      // Keep any teams missing from standings at end
+      const missing = divObj.teams.filter(t => !sortedTeams.includes(t));
+      divObj.teams = [...sortedTeams, ...missing];
+    }
+
+    // Feature 2: Build lastMoves from promotion/relegation results
+    const lastMoves = [];
+    for (const div of divisions) {
+      for (const team of div.teams) {
+        const isRelegatedHere = relegations.some(r => r.relegated === team && r.to === div.name);
+        const isPromotedHere  = promotions.some(p => p.promoted === team && p.to === div.name);
+        const action = isRelegatedHere ? 'demoted' : (isPromotedHere ? 'promoted' : 'stayed');
+        lastMoves.push({ team, action, division: div.name });
+      }
+    }
+    state.lastMoves = lastMoves;
+
     const cfg          = state.generateConfig || {};
     const venues       = cfg.venues       || [{ name: 'Venue 1', courts: 2 }, { name: 'Venue 2', courts: 2 }];
     const startTime    = cfg.startTime    || '18:30';
     const slotDuration = cfg.slotDuration || 35;
     const divTeams     = divisions.map(d => d.teams);
 
+    // Feature 3: Flip venue week parities before rebuilding future weeks
+    const currentParity = (state.schedule && state.schedule.venueWeekParity) || {};
+    const newParity = {};
+    venues.forEach(v => {
+      const cur = currentParity[v.name] != null ? currentParity[v.name] : 0;
+      newParity[v.name] = 1 - cur;
+    });
+    if (state.schedule) state.schedule.venueWeekParity = newParity;
+
+    // Compute venueTimes for rebuilt future weeks
+    const venueTimes = computeVenueTimes(venues, newParity, startTime, slotDuration);
+
     const updatedWeeks = [];
     state.schedule.weeks = state.schedule.weeks.map(w => {
       if (w.weekNum <= weekNum) return w;
-      const newMatches = buildWeekSchedule(divTeams, w.weekNum, w.date, venues, startTime, slotDuration);
+      const newMatches = buildWeekSchedule(divTeams, w.weekNum, w.date, venues, startTime, slotDuration, lastMoves, venueTimes);
       const rebuilt = { ...w, matches: newMatches };
       updatedWeeks.push(rebuilt);
       return rebuilt;
     });
+
+    // Feature 3: Compute divisionTiers from first future week's venue assignments
+    const divisionTiers = {};
+    const firstFutureWeek = state.schedule.weeks.find(w => w.weekNum > weekNum);
+    if (firstFutureWeek) {
+      for (const div of divisions) {
+        const divMatch = firstFutureWeek.matches.find(m => m.division === div.name);
+        if (divMatch && venueTimes) {
+          const venueTime = venueTimes[divMatch.venue] || startTime;
+          divisionTiers[div.name] = parseTime(venueTime) > parseTime(startTime) ? 'late' : 'early';
+        } else {
+          divisionTiers[div.name] = 'early';
+        }
+      }
+    } else {
+      divisions.forEach(d => { divisionTiers[d.name] = 'early'; });
+    }
+    state.divisionTiers = divisionTiers;
 
     if (state.scores) {
       Object.keys(state.scores).forEach(key => {
@@ -1096,7 +1216,7 @@ app.post('/api/finalize-week', async (req, res) => {
 
     await persistState(state);
 
-    res.json({ ok: true, promotions, relegations, updatedWeeks });
+    res.json({ ok: true, promotions, relegations, updatedWeeks, lastMoves });
 
   } catch (err) {
     console.error('Error finalizing week:', err);
